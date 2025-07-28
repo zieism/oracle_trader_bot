@@ -164,7 +164,7 @@ app = FastAPI(
     lifespan=lifespan 
 )
 
-SERVER_PUBLIC_IP = "77.239.102.208" 
+SERVER_PUBLIC_IP = "150.241.85.30" 
 origins = [
     "http://localhost", "http://localhost:5173", "http://localhost:3000", 
     f"http://{SERVER_PUBLIC_IP}:5173", f"http://{SERVER_PUBLIC_IP}",
