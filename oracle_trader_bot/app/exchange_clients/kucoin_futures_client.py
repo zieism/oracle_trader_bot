@@ -181,8 +181,7 @@ class KucoinFuturesClient:
             except KucoinClientException: pass
             return None
 
-    
-async def create_futures_order(
+    async def create_futures_order(
         self,
         symbol: str,
         order_type: str,
