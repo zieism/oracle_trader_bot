@@ -181,8 +181,7 @@ class KucoinFuturesClient:
             except KucoinClientException: pass
             return None
 
-    
-async def create_futures_order(
+    async def create_futures_order(
         self, 
         symbol: str, 
         order_type: str, 
@@ -195,66 +194,109 @@ async def create_futures_order(
         margin_mode: Optional[str] = 'isolated', 
         params: Optional[Dict[str, Any]] = None 
     ) -> Optional[Dict[str, Any]]:
-    context = f"creating {side} {order_type} order for {amount} of {symbol}"
-    if order_type.lower() == 'limit' and price is None:
-        print(f"ERROR ({self.__class__.__name__}): Price required for limit orders for {symbol}.")
-        raise KucoinClientException("Price is required for limit orders.")
-    if not all([settings.KUCOIN_API_KEY, settings.KUCOIN_API_SECRET, settings.KUCOIN_API_PASSPHRASE]):
-        print(f"ERROR ({self.__class__.__name__}): API credentials not configured.")
-        raise KucoinAuthError("API credentials not configured.")
-    await self._ensure_markets_loaded()
-
-    order_execution_params = params.copy() if params else {}
-    if margin_mode:
-        order_execution_params['marginMode'] = margin_mode.lower()
-    if leverage is not None:
-        order_execution_params['leverage'] = leverage
-
-    if side.lower() == "buy":  # Long position
+        context = f"creating {side} {order_type} order for {amount} of {symbol}"
+        if order_type.lower() == 'limit' and price is None:
+            print(f"ERROR ({self.__class__.__name__}): Price required for limit orders for {symbol}.")
+            raise KucoinClientException("Price is required for limit orders.")
+        if not all([settings.KUCOIN_API_KEY, settings.KUCOIN_API_SECRET, settings.KUCOIN_API_PASSPHRASE]):
+            print(f"ERROR ({self.__class__.__name__}): API credentials not configured.")
+            raise KucoinAuthError("API credentials not configured.")
+        await self._ensure_markets_loaded()
+        order_execution_params = params.copy() if params else {}
+        if margin_mode: order_execution_params['marginMode'] = margin_mode.lower() 
+        if leverage is not None: order_execution_params['leverage'] = leverage
         if stop_loss_price is not None:
             order_execution_params['stopLoss'] = {
                 'triggerPrice': self.exchange.price_to_precision(symbol, stop_loss_price),
-                'type': 'market'
-            }
+                'type': 'market' }
         if take_profit_price is not None:
             order_execution_params['takeProfit'] = {
                 'triggerPrice': self.exchange.price_to_precision(symbol, take_profit_price),
-                'type': 'market'
-            }
-    elif side.lower() == "sell":  # Short position
-        if stop_loss_price is not None:
-            order_execution_params['stopLoss'] = {
-                'triggerPrice': self.exchange.price_to_precision(symbol, stop_loss_price),
-                'type': 'market'
-            }
-        if take_profit_price is not None:
-            order_execution_params['takeProfit'] = {
-                'triggerPrice': self.exchange.price_to_precision(symbol, take_profit_price),
-                'type': 'market'
-            }
+                'type': 'market' }
+        if not order_execution_params: order_execution_params = None
+        try:
+            precise_amount = self.exchange.amount_to_precision(symbol, amount)
+            precise_price = self.exchange.price_to_precision(symbol, price) if price is not None else None
+            print(f"INFO ({self.__class__.__name__}): Attempting to create {side} {order_type} order for {symbol}, Precise Amount: {precise_amount}, Precise Price: {precise_price}, CCXT_Params: {order_execution_params}")
+            order = await self.exchange.create_order(symbol=symbol, type=order_type.lower(), side=side.lower(), amount=float(precise_amount), price=float(precise_price) if precise_price is not None else None, params=order_execution_params )
+            print(f"INFO ({self.__class__.__name__}): Order created successfully for {symbol}. Order ID: {order.get('id') if order else 'N/A'}")
+            return order
+        except Exception as e:
+            await self._handle_ccxt_exception(e, context, symbol=symbol)
+            return None
 
-    if not order_execution_params:
-        order_execution_params = None
+    async def create_futures_order(
+        self,
+        symbol: str,
+        order_type: str,
+        side: str,
+        amount: float,
+        price: Optional[float] = None,
+        leverage: Optional[int] = None,
+        stop_loss_price: Optional[float] = None,
+        take_profit_price: Optional[float] = None,
+        margin_mode: Optional[str] = 'isolated',
+        params: Optional[Dict[str, Any]] = None
+    ) -> Optional[Dict[str, Any]]:
+        context = f"creating {side} {order_type} order for {amount} of {symbol}"
+        if order_type.lower() == 'limit' and price is None:
+            print(f"ERROR ({self.__class__.__name__}): Price required for limit orders for {symbol}.")
+            raise KucoinClientException("Price is required for limit orders.")
+        if not all([settings.KUCOIN_API_KEY, settings.KUCOIN_API_SECRET, settings.KUCOIN_API_PASSPHRASE]):
+            print(f"ERROR ({self.__class__.__name__}): API credentials not configured.")
+            raise KucoinAuthError("API credentials not configured.")
 
-    try:
-        precise_amount = self.exchange.amount_to_precision(symbol, amount)
-        precise_price = self.exchange.price_to_precision(symbol, price) if price is not None else None
-        print(f"INFO ({self.__class__.__name__}): Attempting to create {side} {order_type} order for {symbol}, "
-              f"Precise Amount: {precise_amount}, Precise Price: {precise_price}, "
-              f"CCXT_Params: {order_execution_params}")
-        order = await self.exchange.create_order(
-            symbol=symbol,
-            type=order_type.lower(),
-            side=side.lower(),
-            amount=float(precise_amount),
-            price=float(precise_price) if precise_price is not None else None,
-            params=order_execution_params
-        )
-        print(f"INFO ({self.__class__.__name__}): Order created successfully for {symbol}. Order ID: {order.get('id') if order else 'N/A'}")
-        return order
-    except Exception as e:
-        print(f"ERROR ({self.__class__.__name__}): Failed to create order for {symbol}. Error: {str(e)}")
-        raise KucoinRequestError(str(e))
+        await self._ensure_markets_loaded()
+        order_execution_params = params.copy() if params else {}
+
+        if margin_mode:
+            order_execution_params['marginMode'] = margin_mode.lower()
+        if leverage is not None:
+            order_execution_params['leverage'] = leverage
+
+        if side.lower() == "buy":  # Long position
+            if stop_loss_price is not None:
+                order_execution_params['stopLoss'] = {
+                    'triggerPrice': self.exchange.price_to_precision(symbol, stop_loss_price),
+                    'type': 'market'
+                }
+            if take_profit_price is not None:
+                order_execution_params['takeProfit'] = {
+                    'triggerPrice': self.exchange.price_to_precision(symbol, take_profit_price),
+                    'type': 'market'
+                }
+        elif side.lower() == "sell":  # Short position
+            if stop_loss_price is not None:
+                order_execution_params['stopLoss'] = {
+                    'triggerPrice': self.exchange.price_to_precision(symbol, stop_loss_price),
+                    'type': 'market'
+                }
+            if take_profit_price is not None:
+                order_execution_params['takeProfit'] = {
+                    'triggerPrice': self.exchange.price_to_precision(symbol, take_profit_price),
+                    'type': 'market'
+                }
+
+        try:
+            precise_amount = self.exchange.amount_to_precision(symbol, amount)
+            precise_price = self.exchange.price_to_precision(symbol, price) if price is not None else None
+            print(f"INFO ({self.__class__.__name__}): Attempting to create {side} {order_type} order for {symbol}, "
+                  f"Precise Amount: {precise_amount}, Precise Price: {precise_price}, "
+                  f"CCXT_Params: {order_execution_params}")
+            order = await self.exchange.create_order(
+                symbol=symbol,
+                type=order_type.lower(),
+                side=side.lower(),
+                amount=float(precise_amount),
+                price=float(precise_price) if precise_price is not None else None,
+                params=order_execution_params
+            )
+            print(f"INFO ({self.__class__.__name__}): Order created successfully for {symbol}. Order ID: {order.get('id') if order else 'N/A'}")
+            return order
+        except Exception as e:
+            print(f"ERROR ({self.__class__.__name__}): Failed to create order for {symbol}. Error: {str(e)}")
+            raise KucoinRequestError(str(e))
+
 
     async def fetch_order(self, order_id: str, symbol: str) -> Optional[Dict[str, Any]]:
         context = f"fetching order ID {order_id} for symbol {symbol}"
