@@ -256,10 +256,6 @@ async def create_futures_order(
         print(f"ERROR ({self.__class__.__name__}): Failed to create order for {symbol}. Error: {str(e)}")
         raise KucoinRequestError(str(e))
 
-        except Exception as e:
-            await self._handle_ccxt_exception(e, context, symbol=symbol)
-            return None
-
     async def fetch_order(self, order_id: str, symbol: str) -> Optional[Dict[str, Any]]:
         context = f"fetching order ID {order_id} for symbol {symbol}"
         await self._ensure_markets_loaded()
