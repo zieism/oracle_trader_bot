@@ -182,6 +182,9 @@ class KucoinFuturesClient:
             return None
 
 
+    // ===== CORE BUSINESS LOGIC =====
+// Section: create_futures_order in KucoinFuturesClient
+
     async def create_futures_order(
         self, 
         symbol: str, 
@@ -213,14 +216,18 @@ class KucoinFuturesClient:
         if leverage is not None:
             order_execution_params['leverage'] = leverage
 
-        # ===== LOGICALLY VALIDATE TP/SL ACCORDING TO SIDE =====
+        # ===== CORRECTED LOGIC FOR TP/SL BASED ON POSITION DIRECTION =====
         entry_price = price if price is not None else await self.get_market_price(symbol)
         if entry_price is None:
             raise KucoinClientException("Entry price could not be determined.")
 
         if stop_loss_price is not None:
-            if (side.lower() == 'buy' and stop_loss_price >= entry_price) or (side.lower() == 'sell' and stop_loss_price <= entry_price):
-                print(f"WARNING ({self.__class__.__name__}): Invalid stop loss for {side.upper()} order. SL: {stop_loss_price}, Entry: {entry_price}")
+            is_valid_sl = (
+                (side.lower() == 'buy' and stop_loss_price < entry_price) or
+                (side.lower() == 'sell' and stop_loss_price > entry_price)
+            )
+            if not is_valid_sl:
+                print(f"WARNING ({self.__class__.__name__}): INVALID SL for {side.upper()} - SL: {stop_loss_price} vs Entry: {entry_price} (IGNORED)")
             else:
                 order_execution_params['stopLoss'] = {
                     'triggerPrice': self.exchange.price_to_precision(symbol, stop_loss_price),
@@ -228,8 +235,12 @@ class KucoinFuturesClient:
                 }
 
         if take_profit_price is not None:
-            if (side.lower() == 'buy' and take_profit_price <= entry_price) or (side.lower() == 'sell' and take_profit_price >= entry_price):
-                print(f"WARNING ({self.__class__.__name__}): Invalid take profit for {side.upper()} order. TP: {take_profit_price}, Entry: {entry_price}")
+            is_valid_tp = (
+                (side.lower() == 'buy' and take_profit_price > entry_price) or
+                (side.lower() == 'sell' and take_profit_price < entry_price)
+            )
+            if not is_valid_tp:
+                print(f"WARNING ({self.__class__.__name__}): INVALID TP for {side.upper()} - TP: {take_profit_price} vs Entry: {entry_price} (IGNORED)")
             else:
                 order_execution_params['takeProfit'] = {
                     'triggerPrice': self.exchange.price_to_precision(symbol, take_profit_price),
@@ -243,7 +254,7 @@ class KucoinFuturesClient:
             precise_amount = self.exchange.amount_to_precision(symbol, amount)
             precise_price = self.exchange.price_to_precision(symbol, price) if price is not None else None
 
-            print(f"INFO ({self.__class__.__name__}): Attempting to create {side} {order_type} order for {symbol}, Precise Amount: {precise_amount}, Precise Price: {precise_price}, Params: {order_execution_params}")
+            print(f"INFO ({self.__class__.__name__}): Creating {side} {order_type} for {symbol}, amount: {precise_amount}, price: {precise_price}, params: {order_execution_params}")
 
             order = await self.exchange.create_order(
                 symbol=symbol,
@@ -254,12 +265,21 @@ class KucoinFuturesClient:
                 params=order_execution_params
             )
 
-            print(f"INFO ({self.__class__.__name__}): Order created successfully for {symbol}. Order ID: {order.get('id') if order else 'N/A'}")
+            print(f"INFO ({self.__class__.__name__}): Order successful for {symbol}. ID: {order.get('id') if order else 'N/A'}")
             return order
 
         except Exception as e:
             await self._handle_ccxt_exception(e, context, symbol=symbol)
             return None
+
+    async def get_market_price(self, symbol: str) -> Optional[float]:
+        try:
+            ticker = await self.exchange.fetch_ticker(symbol)
+            return ticker['last'] if ticker and 'last' in ticker else None
+        except Exception as e:
+            print(f"ERROR: Could not fetch market price for {symbol}: {e}")
+            return None
+
 
     async def get_market_price(self, symbol: str) -> Optional[float]:
         try:
