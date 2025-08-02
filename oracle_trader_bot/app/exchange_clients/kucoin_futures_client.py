@@ -292,6 +292,16 @@ class KucoinFuturesClient:
     async def get_market_price(self, symbol: str) -> Optional[float]:
         try:
             ticker = await self.exchange.fetch_ticker(symbol)
+            print(f"DEBUG: Full ticker for {symbol}: {ticker}")
+            return ticker['mark'] if ticker and 'mark' in ticker else ticker.get('last')
+        except Exception as e:
+            print(f"ERROR: Could not fetch market price for {symbol}: {e}")
+            return None
+
+
+    async def get_market_price(self, symbol: str) -> Optional[float]:
+        try:
+            ticker = await self.exchange.fetch_ticker(symbol)
             return ticker['mark'] if ticker and 'mark' in ticker else ticker.get('last')
         except Exception as e:
             print(f"ERROR: Could not fetch market price for {symbol}: {e}")
