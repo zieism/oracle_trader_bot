@@ -213,32 +213,30 @@ class KucoinFuturesClient:
         if leverage is not None:
             order_execution_params['leverage'] = leverage
 
-        # ===== CORRECTED LOGIC FOR TP/SL BASED ON POSITION DIRECTION =====
+        # ===== REVERSED LOGIC FOR TP/SL IN SHORT POSITIONS (SWAPPED) =====
         entry_price = price if price is not None else await self.get_market_price(symbol)
         if entry_price is None:
             raise KucoinClientException("Entry price could not be determined.")
 
-        if stop_loss_price is not None:
-            is_valid_sl = (
-                (side.lower() == 'buy' and stop_loss_price < entry_price) or
-                (side.lower() == 'sell' and stop_loss_price > entry_price)
-            )
-            if not is_valid_sl:
-                print(f"WARNING ({self.__class__.__name__}): INVALID SL for {side.upper()} - SL: {stop_loss_price} vs Entry: {entry_price} (IGNORED)")
-            else:
+        if side.lower() == 'sell':
+            # SWAPPED TP/SL for short positions to fix KuCoin direction
+            if take_profit_price is not None:
+                order_execution_params['stopLoss'] = {
+                    'triggerPrice': self.exchange.price_to_precision(symbol, take_profit_price),
+                    'type': 'market'
+                }
+            if stop_loss_price is not None:
+                order_execution_params['takeProfit'] = {
+                    'triggerPrice': self.exchange.price_to_precision(symbol, stop_loss_price),
+                    'type': 'market'
+                }
+        else:
+            if stop_loss_price is not None:
                 order_execution_params['stopLoss'] = {
                     'triggerPrice': self.exchange.price_to_precision(symbol, stop_loss_price),
                     'type': 'market'
                 }
-
-        if take_profit_price is not None:
-            is_valid_tp = (
-                (side.lower() == 'buy' and take_profit_price > entry_price) or
-                (side.lower() == 'sell' and take_profit_price < entry_price)
-            )
-            if not is_valid_tp:
-                print(f"WARNING ({self.__class__.__name__}): INVALID TP for {side.upper()} - TP: {take_profit_price} vs Entry: {entry_price} (IGNORED)")
-            else:
+            if take_profit_price is not None:
                 order_execution_params['takeProfit'] = {
                     'triggerPrice': self.exchange.price_to_precision(symbol, take_profit_price),
                     'type': 'market'
@@ -268,6 +266,15 @@ class KucoinFuturesClient:
         except Exception as e:
             await self._handle_ccxt_exception(e, context, symbol=symbol)
             return None
+
+    async def get_market_price(self, symbol: str) -> Optional[float]:
+        try:
+            ticker = await self.exchange.fetch_ticker(symbol)
+            return ticker['last'] if ticker and 'last' in ticker else None
+        except Exception as e:
+            print(f"ERROR: Could not fetch market price for {symbol}: {e}")
+            return None
+
 
     async def get_market_price(self, symbol: str) -> Optional[float]:
         try:
