@@ -182,9 +182,6 @@ class KucoinFuturesClient:
             return None
             
 
- // ===== CORE BUSINESS LOGIC =====
-// Section: create_futures_order in KucoinFuturesClient
-
     async def create_futures_order(
         self, 
         symbol: str, 
