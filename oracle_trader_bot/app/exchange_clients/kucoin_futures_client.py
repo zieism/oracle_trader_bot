@@ -217,16 +217,21 @@ class KucoinFuturesClient:
         if mark_price is None:
             raise KucoinClientException("Mark price could not be determined.")
 
+        print(f"DEBUG: Mark Price for {symbol} = {mark_price}")
+        print(f"DEBUG: SL = {stop_loss_price}, TP = {take_profit_price}, Side = {side}")
+
         # ✅ STRICT TP/SL LOGIC MATCHING KUCOIN'S INTERPRETATION + triggerDirection
         if side.lower() == 'sell':
             # SHORT: TP < mark, SL > mark
             if take_profit_price is not None and take_profit_price < mark_price:
+                print(f"✅ TP accepted for SHORT: {take_profit_price} < mark {mark_price}")
                 order_execution_params['takeProfit'] = {
                     'triggerPrice': self.exchange.price_to_precision(symbol, take_profit_price),
                     'triggerDirection': 2,  # mark price <= trigger
                     'type': 'market'
                 }
             if stop_loss_price is not None and stop_loss_price > mark_price:
+                print(f"✅ SL accepted for SHORT: {stop_loss_price} > mark {mark_price}")
                 order_execution_params['stopLoss'] = {
                     'triggerPrice': self.exchange.price_to_precision(symbol, stop_loss_price),
                     'triggerDirection': 1,  # mark price >= trigger
@@ -235,12 +240,14 @@ class KucoinFuturesClient:
         else:
             # LONG: TP > mark, SL < mark
             if take_profit_price is not None and take_profit_price > mark_price:
+                print(f"✅ TP accepted for LONG: {take_profit_price} > mark {mark_price}")
                 order_execution_params['takeProfit'] = {
                     'triggerPrice': self.exchange.price_to_precision(symbol, take_profit_price),
                     'triggerDirection': 1,  # mark price >= trigger
                     'type': 'market'
                 }
             if stop_loss_price is not None and stop_loss_price < mark_price:
+                print(f"✅ SL accepted for LONG: {stop_loss_price} < mark {mark_price}")
                 order_execution_params['stopLoss'] = {
                     'triggerPrice': self.exchange.price_to_precision(symbol, stop_loss_price),
                     'triggerDirection': 2,  # mark price <= trigger
@@ -271,6 +278,16 @@ class KucoinFuturesClient:
         except Exception as e:
             await self._handle_ccxt_exception(e, context, symbol=symbol)
             return None
+
+    async def get_market_price(self, symbol: str) -> Optional[float]:
+        try:
+            ticker = await self.exchange.fetch_ticker(symbol)
+            print(f"DEBUG: Full ticker for {symbol}: {ticker}")
+            return ticker['mark'] if ticker and 'mark' in ticker else ticker.get('last')
+        except Exception as e:
+            print(f"ERROR: Could not fetch market price for {symbol}: {e}")
+            return None
+
 
     async def get_market_price(self, symbol: str) -> Optional[float]:
         try:
