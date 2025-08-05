@@ -1,0 +1,282 @@
+/* Custom Dashboard Styles */
+
+/* Theme adjustments */
+:root {
+    --bs-primary: #0d6efd;
+    --bs-success: #198754;
+    --bs-info: #0dcaf0;
+    --bs-warning: #ffc107;
+    --bs-danger: #dc3545;
+    --bs-dark: #212529;
+    --bs-gray-800: #343a40;
+    --bs-gray-900: #212529;
+}
+
+/* Dark theme enhancements */
+[data-bs-theme="dark"] {
+    --bs-body-bg: #1a1a1a;
+    --bs-body-color: #ffffff;
+    --bs-card-bg: #2d2d2d;
+    --bs-border-color: #404040;
+}
+
+/* Card enhancements */
+.card {
+    border: none;
+    box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.3);
+    transition: box-shadow 0.15s ease-in-out;
+}
+
+.card:hover {
+    box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.4);
+}
+
+/* Status indicators */
+.status-indicator {
+    display: inline-block;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    margin-right: 0.5rem;
+}
+
+.status-running {
+    background-color: var(--bs-success);
+    animation: pulse 2s infinite;
+}
+
+.status-stopped {
+    background-color: var(--bs-danger);
+}
+
+.status-unknown {
+    background-color: var(--bs-warning);
+}
+
+/* Pulse animation for running status */
+@keyframes pulse {
+    0% {
+        box-shadow: 0 0 0 0 rgba(25, 135, 84, 0.7);
+    }
+    70% {
+        box-shadow: 0 0 0 10px rgba(25, 135, 84, 0);
+    }
+    100% {
+        box-shadow: 0 0 0 0 rgba(25, 135, 84, 0);
+    }
+}
+
+/* Progress bar animations */
+.progress-bar {
+    transition: width 0.6s ease;
+}
+
+/* Live events styling */
+.event-item {
+    border-left: 4px solid transparent;
+    padding: 0.75rem;
+    margin-bottom: 0.5rem;
+    border-radius: 0.375rem;
+    background: rgba(255, 255, 255, 0.05);
+    transition: all 0.3s ease;
+}
+
+.event-item:hover {
+    background: rgba(255, 255, 255, 0.1);
+    transform: translateX(2px);
+}
+
+.event-item.event-trading {
+    border-left-color: var(--bs-success);
+}
+
+.event-item.event-error {
+    border-left-color: var(--bs-danger);
+}
+
+.event-item.event-info {
+    border-left-color: var(--bs-info);
+}
+
+.event-item.event-warning {
+    border-left-color: var(--bs-warning);
+}
+
+/* Trade list styling */
+.trade-item {
+    transition: background-color 0.3s ease;
+}
+
+.trade-item:hover {
+    background-color: rgba(255, 255, 255, 0.05);
+}
+
+.trade-profit {
+    color: var(--bs-success);
+}
+
+.trade-loss {
+    color: var(--bs-danger);
+}
+
+/* Chart container */
+.chart-container {
+    position: relative;
+    height: 300px;
+    width: 100%;
+}
+
+/* Button enhancements */
+.btn {
+    transition: all 0.3s ease;
+}
+
+.btn:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.2);
+}
+
+/* Loading states */
+.loading {
+    opacity: 0.6;
+    pointer-events: none;
+}
+
+.loading::after {
+    content: "";
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 20px;
+    height: 20px;
+    margin: -10px 0 0 -10px;
+    border: 2px solid transparent;
+    border-top: 2px solid var(--bs-primary);
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .card-body {
+        padding: 1rem;
+    }
+    
+    .btn {
+        padding: 0.5rem 1rem;
+        font-size: 0.875rem;
+    }
+    
+    .fs-1 {
+        font-size: 2rem !important;
+    }
+    
+    h4 {
+        font-size: 1.25rem;
+    }
+}
+
+/* Toast notifications */
+.toast {
+    background-color: var(--bs-card-bg);
+    border: 1px solid var(--bs-border-color);
+}
+
+/* WebSocket status */
+.ws-status-connected {
+    color: var(--bs-success);
+}
+
+.ws-status-disconnected {
+    color: var(--bs-danger);
+}
+
+.ws-status-connecting {
+    color: var(--bs-warning);
+}
+
+/* Table enhancements */
+.table-hover tbody tr:hover {
+    background-color: rgba(255, 255, 255, 0.05);
+}
+
+/* Navbar enhancements */
+.navbar-brand {
+    font-size: 1.5rem;
+}
+
+/* Live update indicators */
+.live-update {
+    animation: highlight 1s ease-in-out;
+}
+
+@keyframes highlight {
+    0% { background-color: rgba(13, 110, 253, 0.3); }
+    100% { background-color: transparent; }
+}
+
+/* Chart responsive */
+@media (max-width: 576px) {
+    .chart-container {
+        height: 250px;
+    }
+}
+
+/* Custom scrollbar for dark theme */
+::-webkit-scrollbar {
+    width: 8px;
+}
+
+::-webkit-scrollbar-track {
+    background: var(--bs-gray-800);
+}
+
+::-webkit-scrollbar-thumb {
+    background: var(--bs-gray-600);
+    border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: var(--bs-gray-500);
+}
+
+/* Status badges */
+.status-badge {
+    font-size: 0.75rem;
+    padding: 0.25rem 0.5rem;
+}
+
+/* Performance metrics styling */
+.metric-value {
+    font-size: 1.25rem;
+    font-weight: 600;
+}
+
+.metric-change {
+    font-size: 0.875rem;
+}
+
+.metric-positive {
+    color: var(--bs-success);
+}
+
+.metric-negative {
+    color: var(--bs-danger);
+}
+
+/* Card headers */
+.card-header {
+    background-color: rgba(255, 255, 255, 0.05);
+    border-bottom: 1px solid var(--bs-border-color);
+}
+
+/* Focus states for accessibility */
+.btn:focus,
+.form-control:focus {
+    box-shadow: 0 0 0 0.25rem rgba(13, 110, 253, 0.25);
+}
