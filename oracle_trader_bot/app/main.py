@@ -30,6 +30,7 @@ from app.api.endpoints import frontend_fastui as frontend_fastui_router
 from app.api.endpoints import bot_management_api as bot_management_router 
 from app.api.endpoints import server_logs_api as server_logs_router 
 from app.api.endpoints import analysis_logs_websocket as analysis_logs_router # ADDED: Import new analysis logs websocket router
+from app.api.endpoints import phase3_monitoring as phase3_monitoring_router # ADDED: Import new Phase 3 monitoring router
 
 # --- Configure logging for FastAPI server to file and console ---
 # Ensure log directory exists
@@ -186,6 +187,7 @@ app.include_router(frontend_fastui_router.router, prefix="/api/ui", tags=["Front
 app.include_router(bot_management_router.router, prefix="/api/v1/bot-management", tags=["Bot Management"])
 app.include_router(server_logs_router.router, prefix="/api/v1/logs", tags=["Server Logs"]) 
 app.include_router(analysis_logs_router.router, prefix="/api/v1", tags=["Analysis Logs (WebSocket)"]) # ADDED: Include new analysis logs router
+app.include_router(phase3_monitoring_router.router, prefix="/api/v1/phase3", tags=["Phase 3 Monitoring & Management"]) # ADDED: Include Phase 3 monitoring router
 
 
 @app.get("/{path:path}", include_in_schema=False) 
