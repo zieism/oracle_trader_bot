@@ -1,0 +1,66 @@
+{
+  "trading": {
+    "max_concurrent_trades": 2,
+    "fixed_trade_amount_usd": 5.0,
+    "daily_loss_limit_percentage": 5.0,
+    "enable_trading": true,
+    "symbols_to_trade": [
+      "BTC/USDT:USDT",
+      "ETH/USDT:USDT"
+    ]
+  },
+  "risk_management": {
+    "daily_loss_limit_pct": 5.0,
+    "max_position_correlation": 0.7,
+    "max_portfolio_leverage": 10.0,
+    "max_drawdown_pct": 15.0,
+    "volatility_threshold": 0.08,
+    "margin_usage_limit": 0.8,
+    "emergency_stop_enabled": true
+  },
+  "strategy_parameters": {
+    "trend_following": {
+      "ema_fast_period": 10,
+      "ema_medium_period": 20,
+      "ema_slow_period": 50,
+      "rsi_period": 14,
+      "rsi_overbought": 70,
+      "rsi_oversold": 30,
+      "min_signal_strength": 0.5
+    },
+    "range_trading": {
+      "rsi_period": 14,
+      "rsi_overbought": 70,
+      "rsi_oversold": 30,
+      "bbands_period": 20,
+      "bbands_std_dev": 2.0,
+      "min_signal_strength": 0.8
+    }
+  },
+  "monitoring": {
+    "enable_alerts": true,
+    "alert_channels": [
+      "log"
+    ],
+    "performance_tracking_enabled": true,
+    "metrics_retention_days": 30
+  },
+  "api": {
+    "rate_limit_per_minute": 30,
+    "enable_cors": true,
+    "debug_mode": false,
+    "request_timeout_seconds": 30
+  },
+  "database": {
+    "connection_pool_size": 5,
+    "connection_timeout": 30,
+    "query_timeout": 60,
+    "enable_query_logging": false
+  },
+  "security": {
+    "encrypt_api_keys": true,
+    "enable_audit_logging": false,
+    "session_timeout_minutes": 60,
+    "max_login_attempts": 5
+  }
+}
