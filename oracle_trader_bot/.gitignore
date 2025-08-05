@@ -28,3 +28,6 @@ dist/
 .env
 *.sqlite3
 instance/
+
+# Test files
+test_phase1_improvements.py
