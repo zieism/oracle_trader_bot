@@ -27,6 +27,14 @@ from app.models.trade import Trade as TradeModel, TradeStatus
 from app.models.bot_settings import BotSettings as BotSettingsModel, TradeAmountMode
 from app.crud import crud_trade, crud_bot_settings
 
+# New service layer imports
+from app.services.trade_manager import TradeManager
+from app.services.signal_generator import SignalGenerator
+from app.services.order_dispatcher import OrderDispatcher
+from app.services.strategy_engine import StrategyEngine
+from app.analysis.multi_timeframe import MultiTimeframeAnalyzer
+from app.analysis.market_condition_detector import MarketConditionDetector
+
 import aiohttp
 
 # --- Configure logging to file and console ---
@@ -83,9 +91,20 @@ kucoin_client: Optional[KucoinFuturesClient] = None
 main_loop_task: Optional[asyncio.Task] = None
 current_bot_db_settings: Optional[BotSettingsModel] = None
 
+# Service layer instances
+trade_manager: Optional[TradeManager] = None
+signal_generator: Optional[SignalGenerator] = None
+order_dispatcher: Optional[OrderDispatcher] = None
+strategy_engine: Optional[StrategyEngine] = None
+multi_timeframe_analyzer: Optional[MultiTimeframeAnalyzer] = None
+market_condition_detector: Optional[MarketConditionDetector] = None
+
 async def initialize_dependencies():
     """Initializes global dependencies like DB and Kucoin client."""
     global global_aiohttp_session, kucoin_client, current_bot_db_settings
+    global trade_manager, signal_generator, order_dispatcher, strategy_engine
+    global multi_timeframe_analyzer, market_condition_detector
+    
     logger.info("Bot Engine: Initializing database...")
     await init_db()
     
@@ -98,6 +117,17 @@ async def initialize_dependencies():
             kucoin_client = KucoinFuturesClient(external_session=global_aiohttp_session)
         await kucoin_client._ensure_markets_loaded()
         logger.info("Bot Engine: KucoinFuturesClient initialized and markets loaded.")
+        
+        # Initialize service layer
+        trade_manager = TradeManager(kucoin_client)
+        signal_generator = SignalGenerator()
+        order_dispatcher = OrderDispatcher(kucoin_client)
+        strategy_engine = StrategyEngine()
+        multi_timeframe_analyzer = MultiTimeframeAnalyzer(kucoin_client)
+        market_condition_detector = MarketConditionDetector()
+        
+        logger.info("Bot Engine: Service layer initialized successfully.")
+        
     except Exception as e:
         logger.error(f"Bot Engine: CRITICAL - Failed to initialize KucoinFuturesClient: {e}", exc_info=True)
         kucoin_client = None; return
@@ -380,6 +410,7 @@ async def process_symbol(
     db_session_factory: sessionmaker,
     bot_config: BotSettingsModel 
 ):
+    """Refactored process_symbol function using service layer."""
     if not kucoin_client:
         logger.error(f"Bot Engine ({symbol}): Kucoin client not initialized. Skipping.")
         return
@@ -399,13 +430,24 @@ async def process_symbol(
 
     try:
         async with db_session_factory() as db: 
+            # Check for existing trades using TradeManager
             active_trade_for_symbol: Optional[TradeModel] = await crud_trade.get_open_trade_by_symbol(db, symbol=symbol)
 
             if active_trade_for_symbol:
                 logger.info(f"Bot Engine ({symbol}): Found active trade in DB (ID: {active_trade_for_symbol.id}). Managing existing trade...")
-                await manage_existing_trade(db, active_trade_for_symbol, symbol) 
+                # Use TradeManager service for existing trade management
+                result = await trade_manager.manage_existing_trade(db, active_trade_for_symbol, symbol)
+                await send_analysis_log({
+                    "timestamp": datetime.now(timezone.utc).isoformat(),
+                    "level": "INFO",
+                    "symbol": symbol,
+                    "strategy": "TradeManager",
+                    "message": f"Trade management result: {result['action']}",
+                    "decision": result['action']
+                })
                 return 
 
+            # Check concurrent trade limits
             open_trades_count_from_db = await crud_trade.count_open_trades(db) 
             logger.info(f"Bot Engine: Currently {open_trades_count_from_db} open trades in DB. Max allowed by config: {bot_config.max_concurrent_trades}")
             if open_trades_count_from_db >= bot_config.max_concurrent_trades:
@@ -420,150 +462,34 @@ async def process_symbol(
                 })
                 return
             
-            logger.debug(f"Bot Engine ({symbol}): No active trade in DB. Checking for new signal.")
+            # Use StrategyEngine for signal generation
+            logger.debug(f"Bot Engine ({symbol}): No active trade in DB. Using StrategyEngine for signal generation.")
             ohlcv_list = await kucoin_client.fetch_ohlcv(symbol, settings.PRIMARY_TIMEFRAME_BOT, limit=settings.CANDLE_LIMIT_BOT)
             
-            min_data_for_indicators = max(
-                settings.TREND_EMA_SLOW_PERIOD, settings.RANGE_BBANDS_PERIOD, 
-                settings.TREND_RSI_PERIOD, settings.TREND_ATR_PERIOD_SL_TP, 
-                settings.REGIME_ADX_PERIOD, (settings.TREND_MACD_SLOW + settings.TREND_MACD_SIGNAL) 
-            )
-            if ohlcv_list is None or len(ohlcv_list) < min_data_for_indicators: 
-                logger.warning(f"Bot Engine ({symbol}): Insufficient OHLCV data. Skipping.")
-                await send_analysis_log({
-                    "timestamp": datetime.now(timezone.utc).isoformat(),
-                    "level": "WARNING",
-                    "symbol": symbol,
-                    "strategy": "N/A",
-                    "message": f"Skipping {symbol}: Insufficient OHLCV data ({len(ohlcv_list) if ohlcv_list else 0} of {min_data_for_indicators} needed).",
-                    "decision": "SKIPPED_INSUFFICIENT_DATA"
-                })
-                return
+            # Get current open positions for signal generator (simplified - we already checked this symbol)
+            current_open_positions = []
             
-            df_with_indicators = calculate_indicators(
-                ohlcv_list,
-                ema_fast_period=settings.TREND_EMA_FAST_PERIOD, ema_medium_period=settings.TREND_EMA_MEDIUM_PERIOD,
-                ema_slow_period=settings.TREND_EMA_SLOW_PERIOD, rsi_period=settings.TREND_RSI_PERIOD,
-                macd_fast_period=settings.TREND_MACD_FAST, macd_slow_period=settings.TREND_MACD_SLOW,
-                macd_signal_period=settings.TREND_MACD_SIGNAL, bbands_period=settings.REGIME_BBW_PERIOD, 
-                bbands_std_dev=float(settings.REGIME_BBW_STD_DEV), atr_period=settings.TREND_ATR_PERIOD_SL_TP, 
-                vol_sma_period=20, adx_period=settings.REGIME_ADX_PERIOD
+            # Generate signal using StrategyEngine
+            trading_signal = await strategy_engine.analyze_and_generate_signal(
+                symbol=symbol,
+                ohlcv_data=ohlcv_list,
+                current_open_positions=current_open_positions,
+                bot_config=bot_config
             )
-            if df_with_indicators is None or df_with_indicators.empty:
-                logger.error(f"Bot Engine ({symbol}): Failed to calculate indicators. Skipping.")
-                await send_analysis_log({
-                    "timestamp": datetime.now(timezone.utc).isoformat(),
-                    "level": "ERROR",
-                    "symbol": symbol,
-                    "strategy": "N/A",
-                    "message": f"Failed to calculate indicators for {symbol}. Skipping.",
-                    "decision": "SKIPPED_INDICATOR_ERROR"
-                })
-                return
-
-            market_regime_info: MarketRegimeInfo = determine_market_regime(
-                df_with_indicators,
-                adx_period=settings.REGIME_ADX_PERIOD,
-                adx_weak_trend_threshold=settings.REGIME_ADX_WEAK_TREND_THRESHOLD,
-                adx_strong_trend_threshold=settings.REGIME_ADX_STRONG_TREND_THRESHOLD,
-                bbands_period_for_bbw=settings.REGIME_BBW_PERIOD,     
-                bbands_std_dev_for_bbw=float(settings.REGIME_BBW_STD_DEV), 
-                bbw_low_threshold=settings.REGIME_BBW_LOW_THRESHOLD,
-                bbw_high_threshold=settings.REGIME_BBW_HIGH_THRESHOLD
-            )
-            logger.info(f"Bot Engine ({symbol}): Determined market regime: {market_regime_info.descriptive_label}")
-            await send_analysis_log({
-                "timestamp": datetime.now(timezone.utc).isoformat(),
-                "level": "INFO",
-                "symbol": symbol,
-                "strategy": "MarketRegime",
-                "message": f"Market regime detected for {symbol}: {market_regime_info.descriptive_label}",
-                "decision": "REGIME_DETECTED",
-                "details": {
-                    "is_trending": market_regime_info.is_trending,
-                    "trend_direction": market_regime_info.trend_direction,
-                    "volatility_level": market_regime_info.volatility_level
-                }
-            })
-            
-            trading_signal: Optional[TradingSignal] = None
-            if market_regime_info.is_trending:
-                logger.info(f"Bot Engine ({symbol}): Attempting Trend-Following strategy...")
-                trading_signal = generate_trend_signal(
-                    symbol=symbol, df_with_indicators=df_with_indicators,
-                    market_regime_info=market_regime_info, current_open_positions_symbols=[],
-                    ema_fast_period=settings.TREND_EMA_FAST_PERIOD, ema_medium_period=settings.TREND_EMA_MEDIUM_PERIOD,
-                    ema_slow_period=settings.TREND_EMA_SLOW_PERIOD, rsi_period=settings.TREND_RSI_PERIOD,
-                    rsi_overbought=settings.TREND_RSI_OVERBOUGHT, rsi_oversold=settings.TREND_RSI_OVERSOLD,
-                    rsi_bull_zone_min=settings.TREND_RSI_BULL_ZONE_MIN, rsi_bear_zone_max=settings.TREND_RSI_BEAR_ZONE_MAX,
-                    atr_period_sl_tp=settings.TREND_ATR_PERIOD_SL_TP, atr_multiplier_sl=settings.TREND_ATR_MULTIPLIER_SL,
-                    tp_rr_ratio=settings.TREND_TP_RR_RATIO, min_signal_strength=settings.TREND_MIN_SIGNAL_STRENGTH,
-                    leverage_tiers_list=settings.TREND_LEVERAGE_TIERS, default_bot_leverage=settings.BOT_DEFAULT_LEVERAGE
-                )
-                await send_analysis_log({
-                    "timestamp": datetime.now(timezone.utc).isoformat(),
-                    "level": "INFO",
-                    "symbol": symbol,
-                    "strategy": "TrendFollowing",
-                    "message": f"Attempting Trend-Following strategy for {symbol}.",
-                    "decision": "STRATEGY_ATTEMPT"
-                })
-
-            elif market_regime_info.trend_direction == "SIDEWAYS" and bot_config.trade_amount_mode != "HIGH":
-                if market_regime_info.volatility_level != "HIGH":
-                    logger.info(f"Bot Engine ({symbol}): Attempting Range-Trading strategy...")
-                    trading_signal = generate_range_signal(
-                        symbol=symbol, df_with_indicators=df_with_indicators,
-                        market_regime_info=market_regime_info, current_open_positions_symbols=[],
-                        rsi_period=settings.RANGE_RSI_PERIOD, rsi_overbought_entry=settings.RANGE_RSI_OVERBOUGHT,
-                        rsi_oversold_entry=settings.RANGE_RSI_OVERSOLD, bbands_period=settings.RANGE_BBANDS_PERIOD,
-                        bbands_std_dev=float(settings.RANGE_BBANDS_STD_DEV), atr_period=settings.RANGE_ATR_PERIOD_SL_TP,
-                        atr_multiplier_sl=settings.RANGE_ATR_MULTIPLIER_SL, tp_rr_ratio=settings.RANGE_TP_RR_RATIO,
-                        min_signal_strength=settings.RANGE_MIN_SIGNAL_STRENGTH,
-                        leverage_tiers_list=settings.RANGE_LEVERAGE_TIERS, default_bot_leverage=settings.BOT_DEFAULT_LEVERAGE
-                    )
-                    await send_analysis_log({
-                        "timestamp": datetime.now(timezone.utc).isoformat(),
-                        "level": "INFO",
-                        "symbol": symbol,
-                        "strategy": "RangeTrading",
-                        "message": f"Attempting Range-Trading strategy for {symbol}.",
-                        "decision": "STRATEGY_ATTEMPT"
-                    })
-                else:
-                    logger.info(f"Bot Engine ({symbol}): Skipping Range-Trading strategy due to HIGH volatility. Regime: '{market_regime_info.descriptive_label}'")
-                    await send_analysis_log({
-                        "timestamp": datetime.now(timezone.utc).isoformat(),
-                        "level": "INFO",
-                        "symbol": symbol,
-                        "strategy": "RangeTrading",
-                        "message": f"Skipping Range-Trading for {symbol} due to HIGH volatility: {market_regime_info.descriptive_label}",
-                        "decision": "SKIPPED_VOLATILITY"
-                    })
-            else:
-                logger.info(f"Bot Engine ({symbol}): No suitable active strategy for current regime '{market_regime_info.descriptive_label}'.")
-                await send_analysis_log({
-                    "timestamp": datetime.now(timezone.utc).isoformat(),
-                    "level": "INFO",
-                    "symbol": symbol,
-                    "strategy": "N/A",
-                    "message": f"No suitable strategy for {symbol} in current regime: {market_regime_info.descriptive_label}",
-                    "decision": "NO_STRATEGY"
-                })
 
             if not trading_signal:
-                logger.info(f"Bot Engine ({symbol}): No new signal generated.")
+                logger.info(f"Bot Engine ({symbol}): No signal generated by StrategyEngine.")
                 await send_analysis_log({
                     "timestamp": datetime.now(timezone.utc).isoformat(),
                     "level": "INFO",
                     "symbol": symbol,
-                    "strategy": "N/A",
-                    "message": f"No new signal generated for {symbol}.",
+                    "strategy": "StrategyEngine",
+                    "message": f"No signal generated for {symbol}.",
                     "decision": "NO_SIGNAL"
                 })
                 return
 
-            logger.info(f"Bot Engine ({symbol}): New Signal: {trading_signal.direction.value} by {trading_signal.strategy_name}, Str: {trading_signal.signal_strength}, Lev: {trading_signal.suggested_leverage}, E: {trading_signal.entry_price}, SL: {trading_signal.stop_loss}, TP: {trading_signal.take_profit}")
+            logger.info(f"Bot Engine ({symbol}): Signal generated: {trading_signal.direction.value} by {trading_signal.strategy_name}, Strength: {trading_signal.signal_strength}, Leverage: {trading_signal.suggested_leverage}x")
             await send_analysis_log({
                 "timestamp": datetime.now(timezone.utc).isoformat(),
                 "level": "INFO",
@@ -580,150 +506,137 @@ async def process_symbol(
                 }
             })
             
-            margin_to_use_usd: float
-            if bot_config.trade_amount_mode == TradeAmountMode.FIXED_USD.value:
-                margin_to_use_usd = bot_config.fixed_trade_amount_usd
-                logger.info(f"Bot Engine ({symbol}): Using FIXED_USD trade amount: {margin_to_use_usd} USD from DB BotSettings")
-            elif bot_config.trade_amount_mode == TradeAmountMode.PERCENTAGE_BALANCE.value:
-                available_balance = await get_current_usdt_balance(kucoin_client)
-                if available_balance > 0 and bot_config.percentage_trade_amount > 0:
-                    margin_to_use_usd = (bot_config.percentage_trade_amount / 100.0) * available_balance
-                    logger.info(f"Bot Engine ({symbol}): Using PERCENTAGE_BALANCE: {bot_config.percentage_trade_amount}% of {available_balance:.2f} USD = {margin_to_use_usd:.2f} USD")
-                else:
-                    logger.warning(f"Bot Engine ({symbol}): Cannot use PERCENTAGE_BALANCE (Balance: {available_balance}, Perc: {bot_config.percentage_trade_amount}). Falling back to FIXED_USD from .env: {settings.FIXED_USD_AMOUNT_PER_TRADE}")
-                    margin_to_use_usd = settings.FIXED_USD_AMOUNT_PER_TRADE 
-            else: 
-                logger.warning(f"Bot Engine ({symbol}): Unknown trade_amount_mode '{bot_config.trade_amount_mode}'. Falling back to FIXED_USD from .env: {settings.FIXED_USD_AMOUNT_PER_TRADE}")
-                margin_to_use_usd = settings.FIXED_USD_AMOUNT_PER_TRADE
+            # Use OrderDispatcher for order execution
+            # Calculate trade amount
+            margin_to_use = await order_dispatcher.calculate_trade_amount(bot_config, symbol)
             
-            leverage_for_order = trading_signal.suggested_leverage 
-            effective_entry_price = trading_signal.entry_price or trading_signal.trigger_price
+            # Calculate order amount
+            order_amount = await order_dispatcher.calculate_order_amount(trading_signal, margin_to_use, symbol)
             
-            if not effective_entry_price or effective_entry_price <= 0:
-                logger.error(f"Bot Engine ({symbol}): Invalid entry/trigger price. Skipping order."); return
-
-            position_val_usd = margin_to_use_usd * leverage_for_order
-            order_amt_base: float = 0.0
-
-            market_info = await kucoin_client.get_market_info(symbol)
-            if not market_info: logger.error(f"Bot Engine ({symbol}): Market info missing. Skipping order."); return
+            if not order_amount:
+                logger.warning(f"Bot Engine ({symbol}): Failed to calculate valid order amount.")
+                await send_analysis_log({
+                    "timestamp": datetime.now(timezone.utc).isoformat(),
+                    "level": "WARNING",
+                    "symbol": symbol,
+                    "strategy": trading_signal.strategy_name,
+                    "message": f"Failed to calculate valid order amount for {symbol}.",
+                    "decision": "ORDER_CALCULATION_FAILED"
+                })
+                return
             
-            amt_prec = market_info.get('precision', {}).get('amount')
-            min_amt = market_info.get('limits', {}).get('amount', {}).get('min')
-            c_size = market_info.get('contractSize', 1.0)
-
-            if effective_entry_price > 0:
-                calc_amt = 0.0
-                if market_info.get('linear', True): calc_amt = position_val_usd / effective_entry_price
-                elif market_info.get('inverse'):
-                    if c_size > 0: calc_amt = position_val_usd / c_size
-                    else: logger.error(f"Bot Engine ({symbol}): Invalid contract size. Skipping."); return
-                else: calc_amt = position_val_usd / effective_entry_price; logger.warning(f"Bot Engine ({symbol}): Assuming linear for amount calc.")
-                order_amt_base = float(kucoin_client.exchange.amount_to_precision(symbol, calc_amt)) if amt_prec is not None else calc_amt
-                if min_amt is not None and order_amt_base < min_amt:
-                    logger.warning(f"Bot Engine ({symbol}): Amount {order_amt_base} < min {min_amt}. Skipping."); 
-                    await send_analysis_log({
-                        "timestamp": datetime.now(timezone.utc).isoformat(),
-                        "level": "WARNING",
-                        "symbol": symbol,
-                        "strategy": trading_signal.strategy_name,
-                        "message": f"Order amount {order_amt_base:.8f} for {symbol} is below minimum {min_amt}. Skipping order.",
-                        "decision": "ORDER_SKIPPED_MIN_AMOUNT"
-                    })
-                    return
-            else: logger.error(f"Bot Engine ({symbol}): Invalid entry price. Skipping."); return
+            # Validate order parameters
+            if not await order_dispatcher.validate_order_parameters(trading_signal, symbol):
+                logger.warning(f"Bot Engine ({symbol}): Order parameter validation failed.")
+                await send_analysis_log({
+                    "timestamp": datetime.now(timezone.utc).isoformat(),
+                    "level": "WARNING",
+                    "symbol": symbol,
+                    "strategy": trading_signal.strategy_name,
+                    "message": f"Order parameter validation failed for {symbol}.",
+                    "decision": "ORDER_VALIDATION_FAILED"
+                })
+                return
             
-            logger.info(f"Bot Engine ({symbol}): Final Order Amount: {order_amt_base:.8f} (Based on Margin: {margin_to_use_usd:.2f} USD)")
+            # Execute order
+            logger.info(f"Bot Engine ({symbol}): Executing order. Amount: {order_amount:.8f}, Margin: {margin_to_use:.2f} USD")
             await send_analysis_log({
                 "timestamp": datetime.now(timezone.utc).isoformat(),
                 "level": "INFO",
                 "symbol": symbol,
                 "strategy": trading_signal.strategy_name,
-                "message": f"Placing order for {symbol}: Side={trading_signal.direction.value}, Amount={order_amt_base:.8f} (USD: {margin_to_use_usd*leverage_for_order:.2f})",
-                "decision": "ORDER_READY"
+                "message": f"Executing order for {symbol}: Side={trading_signal.direction.value}, Amount={order_amount:.8f}",
+                "decision": "ORDER_EXECUTING"
             })
 
-            ccxt_order_side: str
-            if trading_signal.direction == TradeDirection.LONG: ccxt_order_side = 'buy'
-            elif trading_signal.direction == TradeDirection.SHORT: ccxt_order_side = 'sell'
-            else: logger.error(f"Bot Engine ({symbol}): Invalid trade direction. Skipping."); return
-            
-            created_order_info = await kucoin_client.create_futures_order(
-                symbol=symbol, order_type='market', side=ccxt_order_side, 
-                amount=order_amt_base, leverage=leverage_for_order,
-                stop_loss_price=trading_signal.stop_loss, take_profit_price=trading_signal.take_profit,
-                margin_mode='isolated'
-            )
+            order_info = await order_dispatcher.execute_order(trading_signal, order_amount, symbol)
 
-            if created_order_info and created_order_info.get('id'):
-                logger.info(f"Bot Engine ({symbol}): New Order PLACED. ID: {created_order_info.get('id')}")
+            if order_info and order_info.get('id'):
+                logger.info(f"Bot Engine ({symbol}): Order executed successfully. Order ID: {order_info.get('id')}")
                 await send_analysis_log({
                     "timestamp": datetime.now(timezone.utc).isoformat(),
-                    "level": "SUCCESS", # Custom level for successful actions
+                    "level": "SUCCESS",
                     "symbol": symbol,
                     "strategy": trading_signal.strategy_name,
-                    "message": f"Order placed for {symbol}. Order ID: {created_order_info.get('id')}",
-                    "decision": "ORDER_PLACED",
-                    "details": created_order_info
+                    "message": f"Order executed successfully for {symbol}. Order ID: {order_info.get('id')}",
+                    "decision": "ORDER_EXECUTED",
+                    "details": order_info
                 })
-                try:
-                    entry_p = created_order_info.get('average') or effective_entry_price
-                    qty_f = created_order_info.get('filled') if created_order_info.get('filled') is not None else order_amt_base
-                    
-                    trade_entry = TradeCreateSchema(
-                        symbol=created_order_info.get('symbol', symbol), entry_order_id=str(created_order_info.get('id')),
-                        client_order_id_entry=created_order_info.get('clientOrderId'), direction=trading_signal.direction,
-                        entry_price=float(entry_p) if entry_p is not None else None,
-                        quantity=float(qty_f) if qty_f is not None else None,
-                        margin_used_initial=float(margin_to_use_usd), leverage_applied=int(leverage_for_order),
-                        status=TradeStatus.OPEN, 
-                        timestamp_opened=datetime.fromtimestamp(created_order_info.get('timestamp')/1000, tz=timezone.utc) if created_order_info.get('timestamp') else datetime.now(timezone.utc),
-                        strategy_name=trading_signal.strategy_name, market_regime_at_entry=market_regime_info.descriptive_label, 
-                        stop_loss_initial=trading_signal.stop_loss, take_profit_initial=trading_signal.take_profit,
-                        entry_fee=float(created_order_info.get('fee',{}).get('cost',0.0)) if created_order_info.get('fee') else 0.0
-                    )
-                    db_trade = await crud_trade.create_trade(db=db, trade_in=trade_entry)
-                    await db.commit() 
-                    logger.info(f"Bot Engine ({symbol}): New Trade logged to DB. ID: {db_trade.id}")
+                
+                # Use TradeManager to create trade record
+                market_regime_label = strategy_engine.market_condition_cache.get(symbol, {}).get('regime', {}).get('descriptive_label', 'Unknown')
+                
+                db_trade = await trade_manager.create_trade_record(
+                    db=db,
+                    order_info=order_info,
+                    trading_signal=trading_signal,
+                    margin_used=margin_to_use,
+                    market_regime_label=market_regime_label
+                )
+                
+                if db_trade:
+                    logger.info(f"Bot Engine ({symbol}): Trade record created successfully. DB ID: {db_trade.id}")
                     await send_analysis_log({
                         "timestamp": datetime.now(timezone.utc).isoformat(),
                         "level": "INFO",
                         "symbol": symbol,
                         "strategy": trading_signal.strategy_name,
-                        "message": f"Trade logged to DB. DB ID: {db_trade.id}",
-                        "decision": "DB_LOGGED"
+                        "message": f"Trade record created. DB ID: {db_trade.id}",
+                        "decision": "TRADE_RECORDED"
                     })
-                except Exception as db_exc:
-                    logger.error(f"Bot Engine ({symbol}): Failed to log new trade for order {created_order_info.get('id')}: {db_exc}", exc_info=True)
-                    await db.rollback() 
+                else:
+                    logger.error(f"Bot Engine ({symbol}): Failed to create trade record.")
                     await send_analysis_log({
                         "timestamp": datetime.now(timezone.utc).isoformat(),
                         "level": "ERROR",
                         "symbol": symbol,
                         "strategy": trading_signal.strategy_name,
-                        "message": f"Failed to log trade to DB for order {created_order_info.get('id')}: {db_exc}",
-                        "decision": "DB_LOG_FAILED"
+                        "message": f"Failed to create trade record for {symbol}.",
+                        "decision": "TRADE_RECORD_FAILED"
                     })
             else:
-                logger.error(f"Bot Engine ({symbol}): New Order placement failed (client error or no ID).")
+                logger.error(f"Bot Engine ({symbol}): Order execution failed.")
                 await send_analysis_log({
                     "timestamp": datetime.now(timezone.utc).isoformat(),
                     "level": "ERROR",
                     "symbol": symbol,
                     "strategy": trading_signal.strategy_name,
-                    "message": f"Order placement failed for {symbol}.",
+                    "message": f"Order execution failed for {symbol}.",
                     "decision": "ORDER_FAILED"
                 })
 
     except KucoinAuthError as e: 
         logger.error(f"Bot Engine ({symbol}): Auth error: {e}", exc_info=False) 
-        await send_analysis_log({"timestamp": datetime.now(timezone.utc).isoformat(), "level": "ERROR", "symbol": symbol, "strategy": "N/A", "message": f"Auth error: {e}", "decision": "AUTH_ERROR"})
+        await send_analysis_log({
+            "timestamp": datetime.now(timezone.utc).isoformat(), 
+            "level": "ERROR", 
+            "symbol": symbol, 
+            "strategy": "N/A", 
+            "message": f"Auth error: {e}", 
+            "decision": "AUTH_ERROR"
+        })
     except KucoinRequestError as e: 
         logger.error(f"Bot Engine ({symbol}): Exchange request error: {e}", exc_info=False)
-        await send_analysis_log({"timestamp": datetime.now(timezone.utc).isoformat(), "level": "ERROR", "symbol": symbol, "strategy": "N/A", "message": f"Exchange request error: {e}", "decision": "EXCHANGE_ERROR"})
+        await send_analysis_log({
+            "timestamp": datetime.now(timezone.utc).isoformat(), 
+            "level": "ERROR", 
+            "symbol": symbol, 
+            "strategy": "N/A", 
+            "message": f"Exchange request error: {e}", 
+            "decision": "EXCHANGE_ERROR"
+        })
     except Exception as e: 
         logger.error(f"Bot Engine ({symbol}): Unexpected error: {e}", exc_info=True)
-        await send_analysis_log({"timestamp": datetime.now(timezone.utc).isoformat(), "level": "CRITICAL", "symbol": "N/A", "strategy": "N/A", "message": f"Unexpected error in processing {symbol}: {e}", "decision": "UNEXPECTED_ERROR"})
+        await send_analysis_log({
+            "timestamp": datetime.now(timezone.utc).isoformat(), 
+            "level": "CRITICAL", 
+            "symbol": symbol, 
+            "strategy": "N/A", 
+            "message": f"Unexpected error in processing {symbol}: {e}", 
+            "decision": "UNEXPECTED_ERROR"
+        })
+
+
 
 
 async def main_bot_loop_internal():
@@ -733,15 +646,15 @@ async def main_bot_loop_internal():
     # Dependencies are initialized once before the loop starts
     # This function is now called directly in the 'run_bot' wrapper, not here.
     
-    if not kucoin_client or not current_bot_db_settings: 
-        logger.critical("Bot client or Bot DB Settings could not be initialized. Bot cannot start.")
+    if not kucoin_client or not current_bot_db_settings or not strategy_engine: 
+        logger.critical("Bot client, Bot DB Settings, or Service Layer could not be initialized. Bot cannot start.")
         # No need to close sessions here, run_bot will handle shutdown_dependencies if this returns.
         await send_analysis_log({
             "timestamp": datetime.now(timezone.utc).isoformat(),
             "level": "CRITICAL",
             "symbol": "N/A",
             "strategy": "N/A",
-            "message": "Bot dependencies (Kucoin client or DB settings) failed to initialize. Bot cannot start.",
+            "message": "Bot dependencies (Kucoin client, DB settings, or service layer) failed to initialize. Bot cannot start.",
             "decision": "BOT_START_FAILED"
         })
         return
@@ -794,6 +707,38 @@ async def main_bot_loop_internal():
                     await asyncio.sleep(settings.DELAY_BETWEEN_SYMBOL_PROCESSING_SECONDS_BOT) 
 
             logger.info(f"Bot Engine: Trading cycle complete. Waiting {settings.LOOP_SLEEP_DURATION_SECONDS_BOT}s for next cycle...")
+            
+            # Log service layer performance metrics every 10 cycles (adjust as needed)
+            if hasattr(main_bot_loop_internal, 'cycle_count'):
+                main_bot_loop_internal.cycle_count += 1
+            else:
+                main_bot_loop_internal.cycle_count = 1
+            
+            if main_bot_loop_internal.cycle_count % 10 == 0:
+                # Log strategy performance
+                strategy_performance = strategy_engine.get_strategy_performance()
+                market_conditions = strategy_engine.get_market_conditions_summary()
+                
+                logger.info(f"Bot Engine: Service Layer Metrics (Cycle {main_bot_loop_internal.cycle_count}):")
+                logger.info(f"  - Strategy Performance: {len(strategy_performance)} strategies tracked")
+                logger.info(f"  - Market Conditions: {market_conditions.get('total_symbols', 0)} symbols analyzed")
+                logger.info(f"  - Trending Markets: {market_conditions.get('trending_count', 0)}")
+                logger.info(f"  - Ranging Markets: {market_conditions.get('ranging_count', 0)}")
+                
+                await send_analysis_log({
+                    "timestamp": datetime.now(timezone.utc).isoformat(),
+                    "level": "INFO",
+                    "symbol": "N/A",
+                    "strategy": "ServiceLayer",
+                    "message": f"Service layer metrics at cycle {main_bot_loop_internal.cycle_count}",
+                    "decision": "METRICS_REPORT",
+                    "details": {
+                        "cycle_count": main_bot_loop_internal.cycle_count,
+                        "strategy_performance": strategy_performance,
+                        "market_conditions": market_conditions
+                    }
+                })
+            
             await send_analysis_log({
                 "timestamp": datetime.now(timezone.utc).isoformat(),
                 "level": "INFO",
