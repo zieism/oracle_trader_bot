@@ -12,6 +12,7 @@ from logging.handlers import RotatingFileHandler
 import json 
 
 from app.core.config import settings
+from app.core.shutdown_manager import shutdown_manager
 from app.db.session import AsyncSessionFactory, init_db, async_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -856,6 +857,11 @@ if __name__ == "__main__":
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
 
+    # Initialize shutdown manager
+    shutdown_manager.add_cleanup_callback(shutdown_dependencies)
+    shutdown_event = shutdown_manager.create_shutdown_event()
+    logger.info("Bot Engine: Shutdown manager initialized with cleanup callbacks.")
+
     # Flag to track if graceful shutdown is initiated by signal
     _graceful_shutdown_initiated = False
 
@@ -867,6 +873,10 @@ if __name__ == "__main__":
 
         _graceful_shutdown_initiated = True
         logger.info("Bot Engine: Received OS signal (SIGINT/SIGTERM). Starting graceful shutdown...")
+        
+        # Trigger shutdown manager event
+        if shutdown_event:
+            shutdown_event.set()
         
         # Get all running tasks excluding the current one (signal handler task) and tasks that are already done.
         pending_tasks = [task for task in asyncio.all_tasks(loop=loop) if task is not asyncio.current_task() and not task.done()]

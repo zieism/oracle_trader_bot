@@ -193,22 +193,53 @@ async def serve_fastui_html_shell(path: str):
     return HTMLResponse(prebuilt_html(title=f"{settings.PROJECT_NAME} UI", api_root_url="/api/ui"))
 
 @app.get("/api/health", tags=["Health Check"]) 
-async def health_check() -> Dict[str, str]:
-    kucoin_client_status = "initialized" if hasattr(app.state, 'kucoin_client') and app.state.kucoin_client else "not_initialized"
-    db_status = "unknown"
-    try:
-        async with async_engine.connect() as connection:
-            await connection.execute(text("SELECT 1"))
-        db_status = "connected"
-    except Exception:
-        db_status = "disconnected"
+async def health_check() -> Dict[str, Any]:
+    """Enhanced health check endpoint with detailed system monitoring."""
+    from app.core.health_monitor import health_monitor
+    from app.core import bot_process_manager
     
-    from app.core import bot_process_manager 
-    engine_status_str, _ = bot_process_manager.get_bot_process_status()
+    try:
+        # Generate comprehensive health report
+        health_metrics = await health_monitor.generate_health_report(
+            async_engine=async_engine,
+            kucoin_client=getattr(app.state, 'kucoin_client', None),
+            bot_process_manager=bot_process_manager
+        )
+        
+        # Convert to dictionary and add basic compatibility info
+        health_data = health_monitor.to_dict(health_metrics)
+        health_data.update({
+            "project_name": settings.PROJECT_NAME,
+            "version": app.version,
+            "debug_mode": settings.DEBUG,
+        })
+        
+        return health_data
+        
+    except Exception as e:
+        logger.error(f"Health check failed: {e}", exc_info=True)
+        # Fallback to basic health check
+        kucoin_client_status = "initialized" if hasattr(app.state, 'kucoin_client') and app.state.kucoin_client else "not_initialized"
+        db_status = "unknown"
+        try:
+            async with async_engine.connect() as connection:
+                await connection.execute(text("SELECT 1"))
+            db_status = "connected"
+        except Exception:
+            db_status = "disconnected"
+        
+        from app.core import bot_process_manager 
+        engine_status_str, _ = bot_process_manager.get_bot_process_status()
 
-    return {
-        "status": "healthy", "message": "API is operational.", "project_name": settings.PROJECT_NAME,
-        "version": app.version, "debug_mode": settings.DEBUG,
-        "kucoin_client_status": kucoin_client_status, "database_status": db_status,
-        "bot_engine_status": engine_status_str
-    }
+        return {
+            "overall_status": "error",
+            "status": "degraded", 
+            "message": f"Health check error: {str(e)}", 
+            "project_name": settings.PROJECT_NAME,
+            "version": app.version, 
+            "debug_mode": settings.DEBUG,
+            "kucoin_client_status": kucoin_client_status, 
+            "database_status": db_status,
+            "bot_engine_status": engine_status_str,
+            "error": str(e)
+        }

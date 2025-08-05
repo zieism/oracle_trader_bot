@@ -1,5 +1,5 @@
 # app/models/trade.py
-from sqlalchemy import Column, Integer, String, Float, DateTime, Enum as SQLAlchemyEnum, Boolean
+from sqlalchemy import Column, Integer, String, Float, DateTime, Enum as SQLAlchemyEnum, Boolean, Index
 from sqlalchemy.sql import func 
 import enum 
 
@@ -72,4 +72,14 @@ class Trade(Base):
 
     def __repr__(self):
         return f"<Trade(id={self.id}, symbol='{self.symbol}', direction='{self.direction.value if self.direction else 'N/A'}', status='{self.status.value if self.status else 'N/A'}')>"
+
+
+# Composite indexes for performance optimization
+Index('idx_trades_symbol_status', Trade.symbol, Trade.status)
+Index('idx_trades_symbol_timestamp_created', Trade.symbol, Trade.timestamp_created.desc())
+Index('idx_trades_status_timestamp_opened', Trade.status, Trade.timestamp_opened.desc())
+Index('idx_trades_symbol_status_timestamp', Trade.symbol, Trade.status, Trade.timestamp_created.desc())
+Index('idx_trades_strategy_status', Trade.strategy_name, Trade.status)
+Index('idx_trades_open_positions', Trade.symbol, Trade.status, Trade.timestamp_opened, 
+      postgresql_where=(Trade.status == TradeStatus.OPEN))
 

@@ -2,7 +2,9 @@
 import asyncio
 import time 
 import json
+import random
 from typing import Optional, Dict, Any, List, Union
+from functools import wraps
 
 import ccxt.async_support as ccxt 
 from app.core.config import settings
@@ -21,6 +23,57 @@ class KucoinAuthError(KucoinClientException):
 class KucoinRequestError(KucoinClientException):
     """Raised for general request errors from KuCoin."""
     pass
+
+
+def retry_with_exponential_backoff(
+    max_retries: int = 3, 
+    base_delay: float = 1.0,
+    max_delay: float = 60.0,
+    backoff_factor: float = 2.0,
+    jitter: bool = True
+):
+    """
+    Decorator for retry with exponential backoff.
+    
+    Args:
+        max_retries: Maximum number of retry attempts
+        base_delay: Initial delay in seconds
+        max_delay: Maximum delay between retries
+        backoff_factor: Multiplier for delay between retries
+        jitter: Add random jitter to prevent thundering herd
+    """
+    def decorator(func):
+        @wraps(func)
+        async def wrapper(*args, **kwargs):
+            last_exception = None
+            
+            for attempt in range(max_retries + 1):
+                try:
+                    return await func(*args, **kwargs)
+                except (ccxt.NetworkError, ccxt.ExchangeNotAvailable, ccxt.RequestTimeout) as e:
+                    last_exception = e
+                    if attempt == max_retries:
+                        break
+                        
+                    # Calculate delay with exponential backoff
+                    delay = min(base_delay * (backoff_factor ** attempt), max_delay)
+                    
+                    # Add jitter to prevent thundering herd
+                    if jitter:
+                        delay *= (0.5 + random.random() * 0.5)
+                        
+                    print(f"Network error on attempt {attempt + 1}/{max_retries + 1}: {e}. Retrying in {delay:.2f}s...")
+                    await asyncio.sleep(delay)
+                    
+                except (ccxt.AuthenticationError, ccxt.BadSymbol, ccxt.InsufficientFunds, ccxt.InvalidOrder) as e:
+                    # Don't retry on these errors
+                    raise
+                    
+            # If we get here, all retries failed
+            raise last_exception
+            
+        return wrapper
+    return decorator
 
 class KucoinFuturesClient:
     def __init__(self, external_session: Optional[aiohttp.ClientSession] = None):
@@ -48,6 +101,7 @@ class KucoinFuturesClient:
             print(f"ERROR ({self.__class__.__name__}): Failed to initialize CCXT KuCoin Futures client: {e}")
             raise KucoinClientException(f"Failed to initialize CCXT KuCoin Futures client: {e}")
 
+    @retry_with_exponential_backoff(max_retries=3, base_delay=1.0)
     async def _ensure_markets_loaded(self):
         if not self.markets_loaded:
             if not hasattr(self.exchange, 'markets') or not self.exchange.markets: 
@@ -95,6 +149,7 @@ class KucoinFuturesClient:
         else: 
             raise KucoinClientException(f"Unexpected CCXT error for {context}: {e}") from e
 
+    @retry_with_exponential_backoff(max_retries=2, base_delay=0.5)
     async def get_market_info(self, symbol: str) -> Optional[Dict[str, Any]]:
         await self._ensure_markets_loaded()
         try:
@@ -167,6 +222,7 @@ class KucoinFuturesClient:
             except KucoinClientException: pass
             return None
 
+    @retry_with_exponential_backoff(max_retries=2, base_delay=0.5)
     async def fetch_ohlcv(self, symbol: str, timeframe: str = '1h', since: Optional[int] = None, limit: Optional[int] = None) -> Optional[List[List[Any]]]:
         context = f"fetching OHLCV for {symbol} timeframe {timeframe}"
         try:
@@ -182,6 +238,7 @@ class KucoinFuturesClient:
             return None
 
 
+    @retry_with_exponential_backoff(max_retries=2, base_delay=1.0)
     async def create_futures_order(
         self, 
         symbol: str, 
@@ -287,6 +344,7 @@ class KucoinFuturesClient:
             return None
 
 
+    @retry_with_exponential_backoff(max_retries=2, base_delay=0.5)
     async def fetch_order(self, order_id: str, symbol: str) -> Optional[Dict[str, Any]]:
         context = f"fetching order ID {order_id} for symbol {symbol}"
         await self._ensure_markets_loaded()
@@ -301,6 +359,7 @@ class KucoinFuturesClient:
             await self._handle_ccxt_exception(e, context, symbol=symbol)
             return None
 
+    @retry_with_exponential_backoff(max_retries=2, base_delay=0.5)
     async def fetch_open_positions(self, symbol: Optional[str] = None) -> Optional[List[Dict[str, Any]]]:
         context = "fetching open positions"
         if symbol: context += f" for symbol {symbol}"
