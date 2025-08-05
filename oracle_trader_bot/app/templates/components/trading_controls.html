@@ -1,0 +1,39 @@
+<!-- Trading Controls Component -->
+<div class="card mb-4">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <h5 class="card-title mb-0">
+            <i class="bi bi-gear-fill me-2"></i>Trading Controls
+        </h5>
+        <span class="badge bg-secondary" id="ws-connections">0 connections</span>
+    </div>
+    <div class="card-body">
+        <div class="row">
+            <div class="col-md-6">
+                <div class="d-grid gap-2">
+                    <button class="btn btn-success" id="start-bot-btn" onclick="controlBot('start')">
+                        <i class="bi bi-play-fill me-2"></i>Start Bot
+                    </button>
+                    <button class="btn btn-danger" id="stop-bot-btn" onclick="controlBot('stop')">
+                        <i class="bi bi-stop-fill me-2"></i>Stop Bot
+                    </button>
+                    <button class="btn btn-warning" id="restart-bot-btn" onclick="controlBot('restart')">
+                        <i class="bi bi-arrow-clockwise me-2"></i>Restart Bot
+                    </button>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="d-grid gap-2">
+                    <button class="btn btn-info" onclick="emitTestEvent()">
+                        <i class="bi bi-broadcast me-2"></i>Test WebSocket
+                    </button>
+                    <button class="btn btn-secondary" onclick="refreshDashboard()">
+                        <i class="bi bi-arrow-clockwise me-2"></i>Refresh Data
+                    </button>
+                    <button class="btn btn-outline-primary" onclick="toggleChartUpdates()">
+                        <i class="bi bi-pause-fill me-2"></i><span id="chart-toggle-text">Pause Updates</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

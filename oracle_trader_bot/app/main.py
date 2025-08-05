@@ -3,7 +3,8 @@ import logging
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import HTMLResponse 
-from fastapi.middleware.cors import CORSMiddleware 
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 from typing import Dict, Any
 import os 
 from logging.handlers import RotatingFileHandler 
@@ -31,6 +32,10 @@ from app.api.endpoints import bot_management_api as bot_management_router
 from app.api.endpoints import server_logs_api as server_logs_router 
 from app.api.endpoints import analysis_logs_websocket as analysis_logs_router # ADDED: Import new analysis logs websocket router
 from app.api.endpoints import phase3_monitoring as phase3_monitoring_router # ADDED: Import new Phase 3 monitoring router
+
+# Import dashboard components
+from app.dashboard import dashboard_router, dashboard_websocket_router
+from app.dashboard.websocket import startup_websocket_system, shutdown_websocket_system
 
 # --- Configure logging for FastAPI server to file and console ---
 # Ensure log directory exists
@@ -114,11 +119,26 @@ async def lifespan(app: FastAPI):
         logger.error(f"!!! CRITICAL FAILURE DURING STARTUP (DB Initialization) !!!: {e}", exc_info=True)
     
     logger.info("FastUI model rebuild is handled within its respective module.")
+    
+    # Initialize WebSocket system
+    try:
+        await startup_websocket_system()
+        logger.info("WebSocket system initialized successfully.")
+    except Exception as e:
+        logger.error(f"Failed to initialize WebSocket system: {e}", exc_info=True)
 
     logger.info("Application startup complete.")
     yield 
     
     logger.info("Application shutdown sequence initiated...")
+    
+    # Shutdown WebSocket system
+    try:
+        await shutdown_websocket_system()
+        logger.info("WebSocket system shutdown successfully.")
+    except Exception as e:
+        logger.error(f"Error shutting down WebSocket system: {e}", exc_info=True)
+    
     from app.core import bot_process_manager 
     status_str, pid = bot_process_manager.get_bot_process_status()
     if status_str == "running" and pid is not None:
@@ -160,8 +180,8 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(
     title=settings.PROJECT_NAME,
-    description="API for the Automated KuCoin Futures Trading Bot",
-    version="0.1.14_websocket_prep", # Incremented version
+    description="API for the Automated KuCoin Futures Trading Bot with Real-Time Dashboard",
+    version="0.2.0_dashboard", # Incremented version for Phase 4
     lifespan=lifespan 
 )
 
@@ -176,6 +196,9 @@ app.add_middleware(
     allow_methods=["*"], allow_headers=["*"],
 )
 
+# Mount static files for dashboard
+app.mount("/static", StaticFiles(directory="app/static"), name="static")
+
 app.include_router(trades_router.router, prefix="/api/v1/db/trades", tags=["Database - Trades"]) 
 app.include_router(exchange_info_router.router, prefix="/api/v1/exchange", tags=["Exchange Info"]) 
 app.include_router(market_data_router.router, prefix="/api/v1/market", tags=["Market Data & Indicators"]) 
@@ -188,6 +211,10 @@ app.include_router(bot_management_router.router, prefix="/api/v1/bot-management"
 app.include_router(server_logs_router.router, prefix="/api/v1/logs", tags=["Server Logs"]) 
 app.include_router(analysis_logs_router.router, prefix="/api/v1", tags=["Analysis Logs (WebSocket)"]) # ADDED: Include new analysis logs router
 app.include_router(phase3_monitoring_router.router, prefix="/api/v1/phase3", tags=["Phase 3 Monitoring & Management"]) # ADDED: Include Phase 3 monitoring router
+
+# Include dashboard routes
+app.include_router(dashboard_router, prefix="/dashboard", tags=["Real-Time Dashboard"])
+app.include_router(dashboard_websocket_router, prefix="/dashboard", tags=["Dashboard WebSocket"])
 
 
 @app.get("/{path:path}", include_in_schema=False) 
