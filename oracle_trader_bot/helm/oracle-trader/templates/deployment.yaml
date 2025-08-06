@@ -1,0 +1,153 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "oracle-trader.fullname" . }}
+  namespace: {{ .Values.namespace | default "oracle-trader" }}
+  labels:
+    {{- include "oracle-trader.labels" . | nindent 4 }}
+spec:
+  {{- if not .Values.autoscaling.enabled }}
+  replicas: {{ .Values.replicaCount }}
+  {{- end }}
+  selector:
+    matchLabels:
+      {{- include "oracle-trader.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      {{- with .Values.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      labels:
+        {{- include "oracle-trader.selectorLabels" . | nindent 8 }}
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ include "oracle-trader.serviceAccountName" . }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      containers:
+        - name: {{ .Chart.Name }}
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: 8000
+              protocol: TCP
+            - name: metrics
+              containerPort: {{ .Values.monitoring.prometheus.port }}
+              protocol: TCP
+          env:
+            - name: ENVIRONMENT
+              value: {{ .Values.environment }}
+            - name: POSTGRES_SERVER
+              value: {{ .Values.database.host }}
+            - name: POSTGRES_PORT
+              value: {{ .Values.database.port | quote }}
+            - name: POSTGRES_DB
+              value: {{ .Values.database.name }}
+            - name: POSTGRES_USER
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "oracle-trader.fullname" . }}-secrets
+                  key: POSTGRES_USER
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "oracle-trader.fullname" . }}-secrets
+                  key: POSTGRES_PASSWORD
+            - name: REDIS_URL
+              value: {{ .Values.redis.url }}
+            {{- if .Values.exchanges.binance.enabled }}
+            - name: BINANCE_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "oracle-trader.fullname" . }}-secrets
+                  key: BINANCE_API_KEY
+            - name: BINANCE_SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "oracle-trader.fullname" . }}-secrets
+                  key: BINANCE_SECRET_KEY
+            {{- end }}
+            {{- if .Values.exchanges.coinbase.enabled }}
+            - name: COINBASE_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "oracle-trader.fullname" . }}-secrets
+                  key: COINBASE_API_KEY
+            - name: COINBASE_SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "oracle-trader.fullname" . }}-secrets
+                  key: COINBASE_SECRET_KEY
+            - name: COINBASE_PASSPHRASE
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "oracle-trader.fullname" . }}-secrets
+                  key: COINBASE_PASSPHRASE
+            {{- end }}
+            {{- if .Values.exchanges.kraken.enabled }}
+            - name: KRAKEN_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "oracle-trader.fullname" . }}-secrets
+                  key: KRAKEN_API_KEY
+            - name: KRAKEN_SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "oracle-trader.fullname" . }}-secrets
+                  key: KRAKEN_SECRET_KEY
+            {{- end }}
+            - name: SYMBOLS_TO_TRADE_BOT
+              value: {{ .Values.trading.symbols | toJson | quote }}
+            - name: PRIMARY_TIMEFRAME_BOT
+              value: {{ .Values.trading.timeframe }}
+            - name: MAX_CONCURRENT_TRADES_BOT_CONFIG
+              value: {{ .Values.trading.maxConcurrentTrades | quote }}
+            - name: FIXED_USD_AMOUNT_PER_TRADE
+              value: {{ .Values.trading.fixedUsdAmount | quote }}
+            - name: BOT_DEFAULT_LEVERAGE
+              value: {{ .Values.trading.leverage | quote }}
+            - name: PROMETHEUS_PORT
+              value: {{ .Values.monitoring.prometheus.port | quote }}
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 60
+            periodSeconds: 30
+            timeoutSeconds: 10
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+          volumeMounts:
+            - name: logs
+              mountPath: /app/logs
+      volumes:
+        - name: logs
+          emptyDir: {}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}

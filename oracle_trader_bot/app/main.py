@@ -127,10 +127,28 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.error(f"Failed to initialize WebSocket system: {e}", exc_info=True)
 
+    # Initialize Redis connection
+    try:
+        from app.services.redis_service import redis_service
+        await redis_service.connect()
+        app.state.redis_service = redis_service
+        logger.info("Redis service initialized successfully.")
+    except Exception as e:
+        logger.error(f"Failed to initialize Redis service: {e}", exc_info=True)
+        app.state.redis_service = None
+
     logger.info("Application startup complete.")
     yield 
     
     logger.info("Application shutdown sequence initiated...")
+    
+    # Shutdown Redis connection
+    try:
+        if hasattr(app.state, 'redis_service') and app.state.redis_service:
+            await app.state.redis_service.disconnect()
+            logger.info("Redis service shutdown successfully.")
+    except Exception as e:
+        logger.error(f"Error shutting down Redis service: {e}", exc_info=True)
     
     # Shutdown WebSocket system
     try:
@@ -272,3 +290,27 @@ async def health_check() -> Dict[str, Any]:
             "bot_engine_status": engine_status_str,
             "error": str(e)
         }
+
+@app.get("/metrics", tags=["Monitoring"])
+async def metrics_endpoint():
+    """Prometheus metrics endpoint."""
+    from app.monitoring.metrics import metrics_collector
+    from fastapi.responses import PlainTextResponse
+    
+    try:
+        metrics_data = metrics_collector.get_metrics()
+        return PlainTextResponse(content=metrics_data, media_type="text/plain")
+    except Exception as e:
+        logger.error(f"Failed to generate metrics: {e}")
+        return PlainTextResponse(content="# Metrics temporarily unavailable", media_type="text/plain")
+
+@app.get("/api/metrics", tags=["Monitoring"])  
+async def metrics_json_endpoint() -> Dict[str, Any]:
+    """JSON metrics endpoint for internal use."""
+    from app.monitoring.metrics import metrics_collector
+    
+    try:
+        return metrics_collector.get_metrics_dict()
+    except Exception as e:
+        logger.error(f"Failed to generate JSON metrics: {e}")
+        return {"error": str(e), "status": "unavailable"}

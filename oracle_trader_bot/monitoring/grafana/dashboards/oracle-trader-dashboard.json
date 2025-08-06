@@ -1,0 +1,161 @@
+{
+  "dashboard": {
+    "id": null,
+    "title": "Oracle Trader Bot - Trading Dashboard",
+    "tags": ["oracle-trader", "trading", "crypto"],
+    "timezone": "browser",
+    "refresh": "5s",
+    "time": {
+      "from": "now-1h",
+      "to": "now"
+    },
+    "panels": [
+      {
+        "id": 1,
+        "title": "System Health Overview",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "oracle_trader_system_health",
+            "legendFormat": "{{service}}"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "thresholds": {
+              "steps": [
+                {"color": "red", "value": 0},
+                {"color": "green", "value": 1}
+              ]
+            },
+            "mappings": [
+              {"options": {"0": {"text": "Unhealthy"}}, "type": "value"},
+              {"options": {"1": {"text": "Healthy"}}, "type": "value"}
+            ]
+          }
+        },
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 0}
+      },
+      {
+        "id": 2,
+        "title": "Active Trades",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "sum(rate(oracle_trader_trades_total[5m]))",
+            "legendFormat": "Trades/sec"
+          }
+        ],
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 0}
+      },
+      {
+        "id": 3,
+        "title": "Portfolio Balance by Exchange",
+        "type": "timeseries",
+        "targets": [
+          {
+            "expr": "oracle_trader_portfolio_balance_usd",
+            "legendFormat": "{{exchange}}"
+          }
+        ],
+        "gridPos": {"h": 8, "w": 24, "x": 0, "y": 8}
+      },
+      {
+        "id": 4,
+        "title": "Trade Success Rate",
+        "type": "timeseries",
+        "targets": [
+          {
+            "expr": "rate(oracle_trader_trades_total{status=\"filled\"}[5m]) / rate(oracle_trader_trades_total[5m]) * 100",
+            "legendFormat": "Success Rate %"
+          }
+        ],
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 16}
+      },
+      {
+        "id": 5,
+        "title": "Exchange API Latency",
+        "type": "timeseries",
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.95, rate(oracle_trader_exchange_latency_seconds_bucket[5m]))",
+            "legendFormat": "{{exchange}} P95"
+          },
+          {
+            "expr": "histogram_quantile(0.50, rate(oracle_trader_exchange_latency_seconds_bucket[5m]))",
+            "legendFormat": "{{exchange}} P50"
+          }
+        ],
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 16}
+      },
+      {
+        "id": 6,
+        "title": "Arbitrage Opportunities",
+        "type": "timeseries",
+        "targets": [
+          {
+            "expr": "rate(oracle_trader_arbitrage_opportunities_total[5m])",
+            "legendFormat": "{{symbol}} ({{buy_exchange}} -> {{sell_exchange}})"
+          }
+        ],
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 24}
+      },
+      {
+        "id": 7,
+        "title": "Arbitrage Profit",
+        "type": "timeseries",
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.95, rate(oracle_trader_arbitrage_profit_usd_bucket[5m]))",
+            "legendFormat": "P95 Profit"
+          },
+          {
+            "expr": "histogram_quantile(0.50, rate(oracle_trader_arbitrage_profit_usd_bucket[5m]))",
+            "legendFormat": "P50 Profit"
+          }
+        ],
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 24}
+      },
+      {
+        "id": 8,
+        "title": "Risk Metrics",
+        "type": "timeseries",
+        "targets": [
+          {
+            "expr": "oracle_trader_risk_score",
+            "legendFormat": "Risk Score"
+          },
+          {
+            "expr": "oracle_trader_daily_loss_usd",
+            "legendFormat": "Daily Loss USD"
+          }
+        ],
+        "gridPos": {"h": 8, "w": 24, "x": 0, "y": 32}
+      },
+      {
+        "id": 9,
+        "title": "Exchange Errors",
+        "type": "timeseries",
+        "targets": [
+          {
+            "expr": "rate(oracle_trader_exchange_errors_total[5m])",
+            "legendFormat": "{{exchange}} - {{error_type}}"
+          }
+        ],
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 40}
+      },
+      {
+        "id": 10,
+        "title": "Active Connections",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "oracle_trader_active_connections",
+            "legendFormat": "{{type}}"
+          }
+        ],
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 40}
+      }
+    ]
+  }
+}
