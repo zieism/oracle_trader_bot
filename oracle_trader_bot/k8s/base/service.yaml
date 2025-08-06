@@ -1,0 +1,37 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: oracle-trader-service
+  namespace: oracle-trader
+  labels:
+    app: oracle-trader
+spec:
+  type: ClusterIP
+  ports:
+  - port: 8000
+    targetPort: 8000
+    protocol: TCP
+    name: http
+  - port: 8001
+    targetPort: 8001
+    protocol: TCP
+    name: metrics
+  selector:
+    app: oracle-trader
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: oracle-trader-headless
+  namespace: oracle-trader
+  labels:
+    app: oracle-trader
+spec:
+  clusterIP: None
+  ports:
+  - port: 8000
+    targetPort: 8000
+    protocol: TCP
+    name: http
+  selector:
+    app: oracle-trader

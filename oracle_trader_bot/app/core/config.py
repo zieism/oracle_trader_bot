@@ -15,6 +15,24 @@ class Settings(BaseSettings):
     KUCOIN_API_PASSPHRASE: Optional[str] = None
     KUCOIN_API_BASE_URL: str = "https://api-futures.kucoin.com" 
 
+    # Multi-Exchange API Credentials
+    BINANCE_API_KEY: Optional[str] = None
+    BINANCE_SECRET_KEY: Optional[str] = None
+    COINBASE_API_KEY: Optional[str] = None
+    COINBASE_SECRET_KEY: Optional[str] = None
+    COINBASE_PASSPHRASE: Optional[str] = None
+    KRAKEN_API_KEY: Optional[str] = None
+    KRAKEN_SECRET_KEY: Optional[str] = None
+
+    # Cloud Configuration
+    ENVIRONMENT: str = "development"
+    KUBERNETES_NAMESPACE: str = "oracle-trader"
+    REDIS_URL: str = "redis://localhost:6379"
+
+    # Monitoring
+    PROMETHEUS_PORT: int = 8000
+    GRAFANA_URL: str = "http://localhost:3000" 
+
     # Database Credentials
     POSTGRES_SERVER: str = "localhost"
     POSTGRES_PORT: str = "5432"

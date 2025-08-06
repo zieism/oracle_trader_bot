@@ -1,0 +1,130 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: oracle-trader
+  namespace: oracle-trader
+  labels:
+    app: oracle-trader
+    version: v1
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: oracle-trader
+  template:
+    metadata:
+      labels:
+        app: oracle-trader
+        version: v1
+    spec:
+      serviceAccountName: oracle-trader
+      containers:
+      - name: oracle-trader
+        image: oracle-trader:latest
+        ports:
+        - containerPort: 8000
+          name: http
+        - containerPort: 8001
+          name: metrics
+        env:
+        - name: ENVIRONMENT
+          valueFrom:
+            configMapKeyRef:
+              name: oracle-trader-config
+              key: ENVIRONMENT
+        - name: POSTGRES_SERVER
+          valueFrom:
+            configMapKeyRef:
+              name: oracle-trader-config
+              key: POSTGRES_SERVER
+        - name: POSTGRES_PORT
+          valueFrom:
+            configMapKeyRef:
+              name: oracle-trader-config
+              key: POSTGRES_PORT
+        - name: POSTGRES_USER
+          valueFrom:
+            secretKeyRef:
+              name: oracle-trader-secrets
+              key: POSTGRES_USER
+        - name: POSTGRES_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: oracle-trader-secrets
+              key: POSTGRES_PASSWORD
+        - name: POSTGRES_DB
+          valueFrom:
+            configMapKeyRef:
+              name: oracle-trader-config
+              key: POSTGRES_DB
+        - name: REDIS_URL
+          valueFrom:
+            configMapKeyRef:
+              name: oracle-trader-config
+              key: REDIS_URL
+        - name: BINANCE_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: oracle-trader-secrets
+              key: BINANCE_API_KEY
+        - name: BINANCE_SECRET_KEY
+          valueFrom:
+            secretKeyRef:
+              name: oracle-trader-secrets
+              key: BINANCE_SECRET_KEY
+        - name: COINBASE_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: oracle-trader-secrets
+              key: COINBASE_API_KEY
+        - name: COINBASE_SECRET_KEY
+          valueFrom:
+            secretKeyRef:
+              name: oracle-trader-secrets
+              key: COINBASE_SECRET_KEY
+        - name: COINBASE_PASSPHRASE
+          valueFrom:
+            secretKeyRef:
+              name: oracle-trader-secrets
+              key: COINBASE_PASSPHRASE
+        - name: KRAKEN_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: oracle-trader-secrets
+              key: KRAKEN_API_KEY
+        - name: KRAKEN_SECRET_KEY
+          valueFrom:
+            secretKeyRef:
+              name: oracle-trader-secrets
+              key: KRAKEN_SECRET_KEY
+        resources:
+          requests:
+            memory: "512Mi"
+            cpu: "250m"
+          limits:
+            memory: "1Gi"
+            cpu: "500m"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8000
+          initialDelaySeconds: 60
+          periodSeconds: 30
+          timeoutSeconds: 10
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 8000
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        volumeMounts:
+        - name: logs
+          mountPath: /app/logs
+      volumes:
+      - name: logs
+        emptyDir: {}
+      imagePullSecrets:
+      - name: regcred

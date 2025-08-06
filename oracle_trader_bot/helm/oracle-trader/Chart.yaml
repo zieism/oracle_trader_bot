@@ -1,0 +1,18 @@
+apiVersion: v2
+name: oracle-trader
+description: A Helm chart for Oracle Trader Bot - Enterprise Trading Platform
+type: application
+version: 1.0.0
+appVersion: "1.0.0"
+keywords:
+  - trading
+  - crypto
+  - oracle
+  - bot
+  - arbitrage
+home: https://github.com/zieism/oracle_trader_bot
+sources:
+  - https://github.com/zieism/oracle_trader_bot
+maintainers:
+  - name: Oracle Trader Team
+    email: support@oracle-trader.example.com
