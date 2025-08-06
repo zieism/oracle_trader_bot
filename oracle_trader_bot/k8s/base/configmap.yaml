@@ -1,0 +1,26 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: oracle-trader-config
+  namespace: oracle-trader
+data:
+  ENVIRONMENT: "production"
+  POSTGRES_SERVER: "postgres-service"
+  POSTGRES_PORT: "5432"
+  POSTGRES_DB: "oracle_trader"
+  REDIS_URL: "redis://redis-service:6379"
+  PROMETHEUS_PORT: "8001"
+  GRAFANA_URL: "http://grafana:3000"
+  KUBERNETES_NAMESPACE: "oracle-trader"
+  
+  # Trading configuration
+  SYMBOLS_TO_TRADE_BOT: '["BTC/USDT:USDT", "ETH/USDT:USDT"]'
+  PRIMARY_TIMEFRAME_BOT: "1h"
+  CANDLE_LIMIT_BOT: "200"
+  LOOP_SLEEP_DURATION_SECONDS_BOT: "300"
+  
+  # Bot settings
+  MAX_CONCURRENT_TRADES_BOT_CONFIG: "3"
+  TRADE_AMOUNT_MODE_BOT_CONFIG: "FIXED_USD"
+  FIXED_USD_AMOUNT_PER_TRADE: "10.0"
+  BOT_DEFAULT_LEVERAGE: "5"
