@@ -1,0 +1,26 @@
+# LSTM Model Configuration
+sequence_length: 60
+features: 5
+lstm_units: [50, 50, 50]
+dropout_rate: 0.2
+learning_rate: 0.001
+batch_size: 32
+epochs: 100
+
+# Feature columns expected in input data
+feature_columns:
+  - close
+  - volume
+  - rsi
+  - macd
+  - bb_position
+
+# Training parameters
+validation_split: 0.2
+early_stopping:
+  patience: 10
+  min_delta: 0.001
+
+# Model saving
+save_best_only: true
+model_checkpoint_path: "models/trained/lstm_btc_1h.h5"

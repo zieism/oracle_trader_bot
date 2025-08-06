@@ -1,0 +1,42 @@
+# Reinforcement Learning Configuration
+algorithm: "PPO"
+state_size: 105
+action_space: ["buy", "sell", "hold"]
+
+# RL Hyperparameters
+learning_rate: 0.0003
+gamma: 0.99  # Discount factor
+epsilon: 0.2  # PPO clip parameter
+batch_size: 64
+memory_size: 10000
+
+# Training parameters
+episodes: 10000
+max_steps_per_episode: 1000
+update_frequency: 10  # Episodes between policy updates
+
+# Environment configuration
+env_config:
+  initial_balance: 10000
+  transaction_cost: 0.001  # 0.1%
+  max_position_size: 1.0
+  lookback_window: 20
+  feature_columns:
+    - close
+    - volume
+    - rsi
+    - macd
+    - bb_position
+
+# Network architecture
+policy_network:
+  hidden_layers: [256, 128, 64]
+  activation: "relu"
+
+value_network:
+  hidden_layers: [256, 128, 64]
+  activation: "relu"
+
+# Model saving
+model_checkpoint_path: "models/trained/rl_agent_ppo.pkl"
+save_frequency: 100  # Episodes between saves
