@@ -1,0 +1,37 @@
+[Unit]
+Description=Oracle Trader Bot
+Documentation=https://github.com/zieism/oracle_trader_bot
+Requires=docker.service
+After=docker.service
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+WorkingDirectory=/opt/oracle-trader-bot/deployment
+ExecStartPre=/usr/bin/docker-compose -f docker-compose.yml -f docker-compose.prod.yml pull
+ExecStart=/usr/bin/docker-compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+ExecStop=/usr/bin/docker-compose -f docker-compose.yml -f docker-compose.prod.yml down
+ExecReload=/usr/bin/docker-compose -f docker-compose.yml -f docker-compose.prod.yml restart
+TimeoutStartSec=300
+TimeoutStopSec=120
+Restart=on-failure
+RestartSec=30
+
+# Security settings
+User=oracle-trader
+Group=oracle-trader
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=strict
+ProtectHome=yes
+ReadWritePaths=/opt/oracle-trader-bot
+EnvironmentFile=/opt/oracle-trader-bot/deployment/.env
+
+# Resource limits
+LimitNOFILE=65536
+LimitNPROC=4096
+
+[Install]
+WantedBy=multi-user.target
