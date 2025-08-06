@@ -1,0 +1,41 @@
+# Transformer Model Configuration
+d_model: 512
+nhead: 8
+num_layers: 6
+sequence_length: 60
+prediction_horizon: 10
+
+# Architecture parameters
+dropout: 0.1
+learning_rate: 0.0001
+batch_size: 16
+epochs: 100
+
+# Feature configuration
+feature_columns:
+  - close
+  - volume
+  - high
+  - low
+  - open
+  - rsi
+  - macd
+  - bb_upper
+  - bb_lower
+  - bb_middle
+  - sma_20
+  - ema_12
+  - ema_26
+  - atr
+  - volume_sma
+
+# Attention mechanism
+use_positional_encoding: true
+max_sequence_length: 1000
+
+# Training parameters
+validation_split: 0.2
+gradient_clipping: 1.0
+
+# Model saving
+model_checkpoint_path: "models/trained/transformer_market.pth"
