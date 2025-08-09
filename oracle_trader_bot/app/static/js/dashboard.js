@@ -24,6 +24,14 @@ function initializePerformanceChart() {
     const ctx = document.getElementById('performance-chart');
     if (!ctx) return;
     
+    // Check if Chart.js is loaded
+    if (typeof Chart === 'undefined') {
+        console.error('Chart.js is not loaded. Cannot initialize performance chart.');
+        // Show error message in the chart container
+        ctx.innerHTML = '<div class="alert alert-danger">Chart.js library failed to load. Please refresh the page.</div>';
+        return;
+    }
+    
     performanceChart = new Chart(ctx, {
         type: 'line',
         data: {
