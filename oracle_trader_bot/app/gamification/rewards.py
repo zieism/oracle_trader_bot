@@ -65,14 +65,14 @@ class GamificationEngine:
             'community_contribution': 12
         }
     
-    async def award_points(self, user_id: str, action: str, metadata: Dict = None) -> int:
+    async def award_points(self, user_id: str, action: str, reward_metadata: Dict = None) -> int:
         """
         Award points to a user for specific actions.
         
         Args:
             user_id: The user's ID
             action: The action that earned points
-            metadata: Additional data about the action
+            reward_metadata: Additional data about the action
             
         Returns:
             Points awarded
@@ -80,18 +80,18 @@ class GamificationEngine:
         try:
             points = self.point_values.get(action, 0)
             
-            # Apply multipliers based on metadata
-            if metadata:
-                multiplier = metadata.get('multiplier', 1.0)
-                streak_bonus = metadata.get('streak_bonus', 0)
+            # Apply multipliers based on reward_metadata
+            if reward_metadata:
+                multiplier = reward_metadata.get('multiplier', 1.0)
+                streak_bonus = reward_metadata.get('streak_bonus', 0)
                 points = int(points * multiplier) + streak_bonus
             
             async with AsyncSessionFactory() as db:
                 # Update user's total points
-                await self._add_points_to_user(db, user_id, points, action, metadata)
+                await self._add_points_to_user(db, user_id, points, action, reward_metadata)
                 
                 # Check for new achievements
-                await self._check_achievements(db, user_id, action, metadata)
+                await self._check_achievements(db, user_id, action, reward_metadata)
                 
                 logger.info(f"Awarded {points} points to user {user_id} for {action}")
                 return points
@@ -343,7 +343,7 @@ class GamificationEngine:
         
         return achievements
     
-    async def _check_achievements(self, db, user_id: str, action: str, metadata: Dict):
+    async def _check_achievements(self, db, user_id: str, action: str, reward_metadata: Dict):
         """Check if any achievements should be unlocked."""
         # Get user's current stats
         user_stats = await self._get_user_trading_stats(db, user_id)
@@ -361,10 +361,10 @@ class GamificationEngine:
                 continue
             
             # Check if requirements are met
-            if self._check_achievement_requirements(achievement, user_stats, action, metadata):
+            if self._check_achievement_requirements(achievement, user_stats, action, reward_metadata):
                 await self.unlock_achievement(user_id, achievement_id)
     
-    def _check_achievement_requirements(self, achievement: Achievement, user_stats: Dict, action: str, metadata: Dict) -> bool:
+    def _check_achievement_requirements(self, achievement: Achievement, user_stats: Dict, action: str, reward_metadata: Dict) -> bool:
         """Check if achievement requirements are satisfied."""
         requirements = achievement.requirements
         
@@ -380,7 +380,7 @@ class GamificationEngine:
         
         return True
     
-    async def _add_points_to_user(self, db, user_id: str, points: int, action: str, metadata: Dict):
+    async def _add_points_to_user(self, db, user_id: str, points: int, action: str, reward_metadata: Dict):
         """Add points to user's total."""
         # Get or create user points record
         user_points = await db.execute(
@@ -408,7 +408,7 @@ class GamificationEngine:
             user_id=user_id,
             action=action,
             points=points,
-            metadata=metadata or {},
+            reward_metadata=reward_metadata or {},
             timestamp=datetime.utcnow()
         )
         db.add(transaction)
@@ -536,7 +536,7 @@ class PointsTransactionDB(Base):
     user_id = Column(String, index=True, nullable=False)
     action = Column(String, nullable=False)
     points = Column(Integer, nullable=False)
-    metadata = Column(JSON, default=dict)
+    reward_metadata = Column(JSON, default=dict)
     timestamp = Column(DateTime, default=datetime.utcnow, index=True)
 
 

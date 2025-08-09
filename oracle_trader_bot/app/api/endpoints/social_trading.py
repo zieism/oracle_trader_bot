@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from typing import List, Optional
 from sqlalchemy.orm import Session
 
-from app.db.session import get_db
+from app.db.session import get_db_session
 from app.social import (
     copy_trading_engine, 
     leaderboard_service,
@@ -24,7 +24,7 @@ router = APIRouter()
 async def get_leaderboard(
     timeframe: str = Query("1M", regex="^(1D|1W|1M|3M|1Y|ALL)$"),
     limit: int = Query(50, ge=1, le=100),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db_session)
 ):
     """Get trader leaderboard."""
     try:
@@ -37,7 +37,7 @@ async def get_leaderboard(
 @router.get("/trending-traders")
 async def get_trending_traders(
     limit: int = Query(20, ge=1, le=50),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db_session)
 ):
     """Get trending traders."""
     try:
@@ -52,7 +52,7 @@ async def follow_trader(
     leader_id: str,
     follower_id: str,
     copy_settings: dict = None,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db_session)
 ):
     """Follow a trader and optionally enable copy trading."""
     try:
@@ -78,7 +78,7 @@ async def follow_trader(
 async def unfollow_trader(
     leader_id: str,
     follower_id: str,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db_session)
 ):
     """Unfollow a trader."""
     try:
@@ -94,7 +94,7 @@ async def unfollow_trader(
 
 
 @router.get("/copy-trading/stats/{trader_id}")
-async def get_copy_trading_stats(trader_id: str, db: Session = Depends(get_db)):
+async def get_copy_trading_stats(trader_id: str, db: Session = Depends(get_db_session)):
     """Get copy trading statistics for a trader."""
     try:
         stats = await copy_trading_engine.get_copy_trading_stats(trader_id)
@@ -110,7 +110,7 @@ async def get_discussions(
     sort_by: str = Query("latest", regex="^(latest|popular|trending)$"),
     limit: int = Query(20, ge=1, le=100),
     offset: int = Query(0, ge=0),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db_session)
 ):
     """Get community discussions."""
     try:
@@ -127,7 +127,7 @@ async def get_discussions(
 async def create_discussion(
     discussion_data: dict,
     author_id: str,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db_session)
 ):
     """Create a new discussion."""
     try:
@@ -151,7 +151,7 @@ async def create_discussion(
 
 
 @router.get("/discussions/{discussion_id}")
-async def get_discussion(discussion_id: str, db: Session = Depends(get_db)):
+async def get_discussion(discussion_id: str, db: Session = Depends(get_db_session)):
     """Get a specific discussion with replies."""
     try:
         discussion = await community_service.get_discussion(discussion_id)
@@ -170,7 +170,7 @@ async def create_reply(
     discussion_id: str,
     reply_data: dict,
     author_id: str,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db_session)
 ):
     """Create a reply to a discussion."""
     try:
@@ -193,7 +193,7 @@ async def create_reply(
 @router.get("/trending-topics")
 async def get_trending_topics(
     limit: int = Query(10, ge=1, le=50),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db_session)
 ):
     """Get trending discussion topics."""
     try:
@@ -205,7 +205,7 @@ async def get_trending_topics(
 
 # Gamification Endpoints
 @router.get("/gamification/stats/{user_id}")
-async def get_user_gamification_stats(user_id: str, db: Session = Depends(get_db)):
+async def get_user_gamification_stats(user_id: str, db: Session = Depends(get_db_session)):
     """Get user's gamification statistics."""
     try:
         stats = await gamification_engine.get_user_stats(user_id)
@@ -215,7 +215,7 @@ async def get_user_gamification_stats(user_id: str, db: Session = Depends(get_db
 
 
 @router.get("/gamification/achievements/{user_id}")
-async def get_user_achievements(user_id: str, db: Session = Depends(get_db)):
+async def get_user_achievements(user_id: str, db: Session = Depends(get_db_session)):
     """Get user's achievements."""
     try:
         achievements = await gamification_engine.get_available_achievements(user_id)
@@ -228,7 +228,7 @@ async def get_user_achievements(user_id: str, db: Session = Depends(get_db)):
 async def get_points_leaderboard(
     timeframe: str = Query("all_time", regex="^(weekly|monthly|all_time)$"),
     limit: int = Query(100, ge=1, le=100),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db_session)
 ):
     """Get points leaderboard."""
     try:
@@ -243,7 +243,7 @@ async def award_points(
     user_id: str,
     action: str,
     metadata: dict = None,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db_session)
 ):
     """Award points to a user for an action."""
     try:
@@ -257,7 +257,7 @@ async def award_points(
 @router.post("/notifications/register-device")
 async def register_device(
     device_data: dict,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db_session)
 ):
     """Register a device for push notifications."""
     try:
@@ -275,7 +275,7 @@ async def register_device(
 @router.post("/notifications/send")
 async def send_notification(
     notification_data: dict,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db_session)
 ):
     """Send a push notification to a user."""
     try:
@@ -297,7 +297,7 @@ async def send_notification(
 
 # Alert Endpoints
 @router.get("/alerts/personalized/{user_id}")
-async def get_personalized_alerts(user_id: str, db: Session = Depends(get_db)):
+async def get_personalized_alerts(user_id: str, db: Session = Depends(get_db_session)):
     """Get personalized alerts for a user."""
     try:
         alerts = await smart_alert_engine.personalized_alerts(user_id)
@@ -323,7 +323,7 @@ async def get_personalized_alerts(user_id: str, db: Session = Depends(get_db)):
 async def set_alert_preferences(
     user_id: str,
     preferences: dict,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db_session)
 ):
     """Set alert preferences for a user."""
     try:
@@ -336,7 +336,7 @@ async def set_alert_preferences(
 @router.post("/alerts/price-alert")
 async def add_price_alert(
     alert_data: dict,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db_session)
 ):
     """Add a price alert for a user."""
     try:

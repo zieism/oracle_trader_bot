@@ -21,7 +21,7 @@ services:
       - LOG_LEVEL=${LOG_LEVEL:-INFO}
     volumes:
       - ./logs:/app/logs
-      - ../.env:/app/.env:ro
+      - ./.env:/app/.env:ro
       - app_data:/app/data
     depends_on:
       postgres:

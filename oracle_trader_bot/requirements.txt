@@ -108,3 +108,4 @@ opencv-python>=4.8.0
 # Time Series
 arch>=6.2.0
 statsmodels>=0.14.0
+httpx>=0.24.0
