@@ -1,12 +1,7 @@
+# app/api/endpoints/frontend_fastui.py
+from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import JSONResponse
 from fastapi.encoders import jsonable_encoder
-@router.get("/ui", response_model=FastUI, response_model_exclude_none=True)
-async def fastui_dashboard_ui_api(
-    kucoin_client: KucoinFuturesClient = Depends(get_kucoin_client)
-) -> FastUI:
-    components = await fastui_dashboard_root_api(kucoin_client)
-    return FastUI(components=components)
-from fastapi import APIRouter, Depends, HTTPException
 from fastui import FastUI, AnyComponent
 from fastui import components as c
 from fastui.components.display import DisplayMode, DisplayLookup
@@ -15,17 +10,18 @@ from pydantic import BaseModel, Field
 from datetime import datetime, timezone
 from typing import List, Optional, Dict
 import logging
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.dependencies import get_kucoin_client
 from app.exchange_clients.kucoin_futures_client import KucoinFuturesClient
 from app.db.session import get_db_session
 from app.schemas.bot_settings import BotSettings as BotSettingsSchema
 from app.crud import crud_bot_settings
-from sqlalchemy.ext.asyncio import AsyncSession
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
+
 
 class AccountBalance(BaseModel):
     currency: str
@@ -33,36 +29,24 @@ class AccountBalance(BaseModel):
     free: Optional[float] = None
     used: Optional[float] = None
 
+
 class DashboardData(BaseModel):
     bot_status: str = "Initializing..."
     last_update: str
     account_overview: Optional[List[AccountBalance]] = None
     error_message: Optional[str] = None
 
-@router.get("/ui")
-async def fastui_dashboard_ui_api(
-    kucoin_client: KucoinFuturesClient = Depends(get_kucoin_client),
-    db: AsyncSession = Depends(get_db_session)
-):
-    components = await fastui_dashboard_root_api(kucoin_client)
-    # دریافت bot settings و افزودن به متادیتا
-    try:
-        settings = await crud_bot_settings.get_settings(db)
-        if not settings:
-            settings = BotSettingsSchema(
-                symbols_to_trade=[],
-                max_concurrent_trades=0,
-                trade_amount_mode="",
-                fixed_trade_amount_usd=0,
-                percentage_trade_amount=0,
-                daily_loss_limit_percentage=None,
-                updated_at=None
-            )
-    except Exception as e:
-        settings = None
-    fastui_obj = FastUI(components=components, metadata={"bot_settings": settings.dict() if settings else {}})
-    return JSONResponse(content=jsonable_encoder(fastui_obj))
 
+async def fastui_dashboard_root_api(
+    kucoin_client: KucoinFuturesClient,
+    db: AsyncSession
+) -> List[AnyComponent]:
+    """
+    Generate FastUI components for the dashboard root page.
+    """
+    dashboard_data = DashboardData(
+        last_update=datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S UTC')
+    )
 
     # Graceful error handling for Kucoin client and account overview
     if kucoin_client is None:
@@ -138,6 +122,38 @@ async def fastui_dashboard_ui_api(
         ]),
         c.Footer(extra_text=f"© {datetime.now(timezone.utc).year} Oracle Trader Bot", links=[])
     ]
+
+
+@router.get("/ui", response_model=FastUI, response_model_exclude_none=True)
+async def fastui_dashboard_ui_api(
+    kucoin_client: KucoinFuturesClient = Depends(get_kucoin_client),
+    db: AsyncSession = Depends(get_db_session)
+):
+    """
+    FastUI dashboard endpoint.
+    """
+    components = await fastui_dashboard_root_api(kucoin_client, db)
+    
+    # دریافت bot settings و افزودن به متادیتا
+    try:
+        settings = await crud_bot_settings.get_bot_settings(db)
+        if not settings:
+            settings = BotSettingsSchema(
+                symbols_to_trade=[],
+                max_concurrent_trades=0,
+                trade_amount_mode="FIXED",
+                fixed_trade_amount_usd=10.0,
+                percentage_trade_amount=1.0,
+                daily_loss_limit_percentage=5.0,
+                updated_at=None
+            )
+    except Exception as e:
+        logger.error(f"Error fetching bot settings: {e}")
+        settings = None
+        
+    fastui_obj = FastUI(components=components, metadata={"bot_settings": settings.dict() if settings else {}})
+    return JSONResponse(content=jsonable_encoder(fastui_obj))
+
 
 # Rebuild Pydantic models to resolve any forward references
 AccountBalance.model_rebuild()
