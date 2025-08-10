@@ -6,7 +6,7 @@ from datetime import datetime
 
 class DashboardData(BaseModel):
     """Data model for dashboard information."""
-    timestamp: datetime
+    timestamp: float
     bot_status: str
     active_positions: int
     total_trades: int
@@ -15,6 +15,7 @@ class DashboardData(BaseModel):
     market_data: Dict[str, Any]
     recent_trades: List[Dict[str, Any]]
     system_health: Dict[str, Any]
+    account_overview: Optional[List[Dict[str, Any]]] = []
 
 
 class ChartData(BaseModel):
@@ -35,14 +36,14 @@ class MarketTicker(BaseModel):
 class TradingMetrics(BaseModel):
     """Trading performance metrics."""
     total_trades: int
-    winning_trades: int
+    profitable_trades: int
     losing_trades: int
     win_rate: float
     total_pnl: float
-    daily_pnl: float
-    weekly_pnl: float
+    average_pnl_per_trade: float
+    max_profit: float
+    max_loss: float
     max_drawdown: float
-    sharpe_ratio: Optional[float] = None
 
 
 class SystemStatus(BaseModel):
@@ -52,4 +53,4 @@ class SystemStatus(BaseModel):
     cpu_usage: float
     memory_usage: float
     websocket_connections: int
-    last_update: datetime
+    last_update: float

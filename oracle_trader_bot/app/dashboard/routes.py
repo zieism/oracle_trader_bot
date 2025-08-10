@@ -88,10 +88,24 @@ async def get_dashboard_data(db: AsyncSession = Depends(get_db_session)):
 
         # --- Real account balance from Kucoin ---
         total_balance = 0.0
+        account_overview = []
         try:
             overview = await kucoin_client.get_account_overview()
-            if overview and 'USDT' in overview and 'total' in overview['USDT']:
-                total_balance = overview['USDT']['total']
+            if overview:
+                for currency_code, balance_info in overview.items():
+                    if currency_code.upper() in ['INFO', 'TIMESTAMP', 'DATETIME', 'FREE', 'USED', 'TOTAL']:
+                        continue
+                    if isinstance(balance_info, dict) and 'total' in balance_info:
+                        total_val = balance_info.get('total', 0)
+                        if currency_code == 'USDT' or (total_val is not None and total_val > 0):
+                            account_overview.append({
+                                "currency": currency_code,
+                                "total": total_val,
+                                "free": balance_info.get('free', 0),
+                                "used": balance_info.get('used', 0)
+                            })
+                        if currency_code == 'USDT' and total_val is not None:
+                            total_balance = total_val
         except Exception as e:
             logger.error(f"Error fetching account balance from Kucoin: {e}")
 
@@ -112,7 +126,8 @@ async def get_dashboard_data(db: AsyncSession = Depends(get_db_session)):
             total_balance=total_balance,
             market_data=market_data,
             recent_trades=recent_trades_data,
-            system_health=system_health
+            system_health=system_health,
+            account_overview=account_overview
         )
 
         return dashboard_data
@@ -134,43 +149,33 @@ async def get_trading_metrics(db: AsyncSession = Depends(get_db_session)):
         if not all_trades:
             return TradingMetrics(
                 total_trades=0,
-
-                # --- Real market data and account info from Kucoin ---
-                from app.api.dependencies import get_kucoin_client
-                kucoin_client = get_kucoin_client()
-                market_data = {}
-                account_overview = []
-                total_balance = 0.0
-                try:
-                    btc_ticker = await kucoin_client.get_ticker("BTCUSDT")
-                    eth_ticker = await kucoin_client.get_ticker("ETHUSDT")
-                    market_data = {
-                        "BTC/USDT": {"price": btc_ticker.get('price'), "change": btc_ticker.get('change', 0)},
-                        "ETH/USDT": {"price": eth_ticker.get('price'), "change": eth_ticker.get('change', 0)},
-                    }
-                    overview = await kucoin_client.get_account_overview()
-                    if overview:
-                        for currency_code, balance_info in overview.items():
-                            if currency_code.upper() in ['INFO', 'TIMESTAMP', 'DATETIME', 'FREE', 'USED', 'TOTAL']:
-                                continue
-                            if isinstance(balance_info, dict) and 'total' in balance_info:
-                                total_val = balance_info.get('total')
-                                if currency_code == 'USDT' or (total_val is not None and total_val > 0):
-                                    account_overview.append({
-                                        "currency": currency_code,
-                                        "total": total_val,
-                                        "free": balance_info.get('free'),
-                                        "used": balance_info.get('used')
-                                    })
-                                if currency_code == 'USDT' and total_val is not None:
-                                    total_balance = total_val
-                except Exception as e:
-                    logger.error(f"Error fetching market/account data from Kucoin: {e}")
-                    market_data = {
-                        "BTC/USDT": {"price": None, "change": None},
-                        "ETH/USDT": {"price": None, "change": None},
-                    }
-
+                profitable_trades=0,
+                losing_trades=0,
+                win_rate=0.0,
+                total_pnl=0.0,
+                average_pnl_per_trade=0.0,
+                max_profit=0.0,
+                max_loss=0.0,
+                max_drawdown=0.0
+            )
+        
+        # Calculate metrics
+        total_trades = len(all_trades)
+        profitable_trades = sum(1 for trade in all_trades if trade.pnl and float(trade.pnl) > 0)
+        losing_trades = sum(1 for trade in all_trades if trade.pnl and float(trade.pnl) < 0)
+        win_rate = (profitable_trades / total_trades * 100) if total_trades > 0 else 0.0
+        
+        pnl_values = [float(trade.pnl) if trade.pnl else 0.0 for trade in all_trades]
+        total_pnl = sum(pnl_values)
+        average_pnl_per_trade = total_pnl / total_trades if total_trades > 0 else 0.0
+        max_profit = max(pnl_values) if pnl_values else 0.0
+        max_loss = min(pnl_values) if pnl_values else 0.0
+        
+        # Calculate max drawdown
+        cumulative_pnl = []
+        cumsum = 0.0
+        for pnl in pnl_values:
+            cumsum += pnl
             cumulative_pnl.append(cumsum)
         
         max_drawdown = 0.0
@@ -179,21 +184,20 @@ async def get_trading_metrics(db: AsyncSession = Depends(get_db_session)):
             for value in cumulative_pnl:
                 if value > peak:
                     peak = value
-
-                dashboard_data = DashboardData(
-                    timestamp=time.time(),
-                    bot_status=bot_status_str,
-                    active_positions=0,  # TODO: Get from portfolio manager
-                    total_trades=total_trades,
-                    daily_pnl=daily_pnl,
-                    total_balance=total_balance,
-                    market_data=market_data,
-                    recent_trades=recent_trades_data,
-                    system_health=system_health,
-                    account_overview=account_overview
-                )
-
-                return dashboard_data
+                drawdown = peak - value
+                if drawdown > max_drawdown:
+                    max_drawdown = drawdown
+        
+        return TradingMetrics(
+            total_trades=total_trades,
+            profitable_trades=profitable_trades,
+            losing_trades=losing_trades,
+            win_rate=win_rate,
+            total_pnl=total_pnl,
+            average_pnl_per_trade=average_pnl_per_trade,
+            max_profit=max_profit,
+            max_loss=max_loss,
+            max_drawdown=max_drawdown
         )
         
     except Exception as e:
