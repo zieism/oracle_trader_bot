@@ -22,15 +22,21 @@ async def read_bot_settings(
     Retrieve the current bot operational settings.
     If no settings exist, default settings will be created and returned.
     """
-    db_settings = await crud_bot_settings.get_bot_settings(db=db)
-    if db_settings is None:
-        # This case should ideally be handled by get_bot_settings creating defaults
-        # But if it can still return None (e.g., DB error during creation of defaults)
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Bot settings not found and could not be created with defaults."
-        )
-    return db_settings
+        try:
+            settings = await crud_bot_settings.get_settings(db)
+            if not settings:
+                return BotSettingsSchema(
+                    symbols_to_trade=[],
+                    max_concurrent_trades=0,
+                    trade_amount_mode="",
+                    fixed_trade_amount_usd=0,
+                    percentage_trade_amount=0,
+                    daily_loss_limit_percentage=None,
+                    updated_at=None
+                )
+            return settings
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Error fetching bot settings: {str(e)}")
 
 @router.put(
     "/", # Endpoint will be /api/v1/bot-settings/
