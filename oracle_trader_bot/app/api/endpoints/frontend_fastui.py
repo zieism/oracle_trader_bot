@@ -1,9 +1,9 @@
 @router.get("/ui", response_model=FastUI, response_model_exclude_none=True)
 async def fastui_dashboard_ui_api(
     kucoin_client: KucoinFuturesClient = Depends(get_kucoin_client)
-) -> Dict[str, Any]:
+) -> FastUI:
     components = await fastui_dashboard_root_api(kucoin_client)
-    return {"components": components}
+    return FastUI(components=components)
 from fastapi import APIRouter, Depends, HTTPException
 from fastui import FastUI, AnyComponent
 from fastui import components as c
