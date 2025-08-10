@@ -34,12 +34,14 @@ async def fastui_dashboard_root_api(
     dashboard_data = DashboardData(last_update=datetime.now(timezone.utc).isoformat(timespec='seconds'))
     logger.debug("FastUI: Entered dashboard_root_api")
 
-    try:
-        if kucoin_client is None:
-            dashboard_data.bot_status = "Error: KuCoin Client Unavailable"
-            dashboard_data.error_message = "Exchange client not initialized. Check server startup logs."
-            logger.critical("FastUI: KuCoin client is None in dashboard_root_api.")
-        else:
+
+    # Graceful error handling for Kucoin client and account overview
+    if kucoin_client is None:
+        dashboard_data.bot_status = "Error: KuCoin Client Unavailable"
+        dashboard_data.error_message = "Exchange client not initialized. Check server startup logs."
+        logger.critical("FastUI: KuCoin client is None in dashboard_root_api.")
+    else:
+        try:
             logger.debug("FastUI: Fetching account overview...")
             overview = await kucoin_client.get_account_overview()
             if overview:
@@ -72,11 +74,10 @@ async def fastui_dashboard_root_api(
                 dashboard_data.bot_status = "Warning: Could not fetch account overview."
                 dashboard_data.error_message = "Failed to retrieve account balance from exchange."
                 logger.warning(f"FastUI: Account overview fetch returned None or empty for dashboard.")
-
-    except Exception as e:
-        dashboard_data.bot_status = "Error Fetching Dashboard Data"
-        dashboard_data.error_message = f"An unexpected error occurred: {str(e)}"
-        logger.error("FastUI: Error in dashboard_root_api", exc_info=True)
+        except Exception as e:
+            dashboard_data.bot_status = "Error Fetching Dashboard Data"
+            dashboard_data.error_message = f"An unexpected error occurred: {str(e)}"
+            logger.error("FastUI: Error in dashboard_root_api", exc_info=True)
 
     logger.debug(f"FastUI: Returning components for dashboard. Bot Status: {dashboard_data.bot_status}")
     return [
@@ -100,7 +101,7 @@ async def fastui_dashboard_root_api(
                     DisplayLookup(field='total', title='Total', mode=DisplayMode.float, format="%.4f"),
                 ],
                 no_data_message="No balance data available or error fetching."
-            ) if dashboard_data.account_overview or dashboard_data.error_message else c.Paragraph(text="Loading account balances..."),
+            ),
             c.Div(components=[
                 c.Link(components=[c.Button(text='View Bot Settings', class_name="btn btn-primary mt-4")], on_click=GoToEvent(url='/bot-settings-view')),
                 c.Link(components=[c.Button(text='View Trades Log', class_name="btn btn-secondary mt-4 ml-2")], on_click=GoToEvent(url='/trades-log')),

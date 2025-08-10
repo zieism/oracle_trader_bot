@@ -67,12 +67,34 @@ async def get_dashboard_data(db: AsyncSession = Depends(get_db_session)):
         # Get WebSocket connection stats
         ws_stats = websocket_manager.get_connection_stats()
         
-        # Mock market data (in production, get from exchange)
-        market_data = {
-            "BTC/USDT": {"price": 45000.0, "change": 2.5},
-            "ETH/USDT": {"price": 3200.0, "change": -1.2},
-        }
-        
+
+        # --- Real market data from Kucoin ---
+        from app.api.dependencies import get_kucoin_client
+        kucoin_client = get_kucoin_client()
+        market_data = {}
+        try:
+            btc_ticker = await kucoin_client.get_ticker("BTCUSDT")
+            eth_ticker = await kucoin_client.get_ticker("ETHUSDT")
+            market_data = {
+                "BTC/USDT": {"price": btc_ticker['price'], "change": btc_ticker.get('change', 0)},
+                "ETH/USDT": {"price": eth_ticker['price'], "change": eth_ticker.get('change', 0)},
+            }
+        except Exception as e:
+            logger.error(f"Error fetching market data from Kucoin: {e}")
+            market_data = {
+                "BTC/USDT": {"price": None, "change": None},
+                "ETH/USDT": {"price": None, "change": None},
+            }
+
+        # --- Real account balance from Kucoin ---
+        total_balance = 0.0
+        try:
+            overview = await kucoin_client.get_account_overview()
+            if overview and 'USDT' in overview and 'total' in overview['USDT']:
+                total_balance = overview['USDT']['total']
+        except Exception as e:
+            logger.error(f"Error fetching account balance from Kucoin: {e}")
+
         # System health mock data
         system_health = {
             "cpu_usage": 25.5,
@@ -80,19 +102,19 @@ async def get_dashboard_data(db: AsyncSession = Depends(get_db_session)):
             "disk_usage": 45.0,
             "websocket_connections": ws_stats["total_connections"]
         }
-        
+
         dashboard_data = DashboardData(
             timestamp=time.time(),
             bot_status=bot_status_str,
             active_positions=0,  # TODO: Get from portfolio manager
             total_trades=total_trades,
             daily_pnl=daily_pnl,
-            total_balance=10000.0,  # TODO: Get from account balance
+            total_balance=total_balance,
             market_data=market_data,
             recent_trades=recent_trades_data,
             system_health=system_health
         )
-        
+
         return dashboard_data
         
     except Exception as e:
