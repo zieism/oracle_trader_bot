@@ -1,3 +1,5 @@
+from fastapi.responses import JSONResponse
+from fastapi.encoders import jsonable_encoder
 @router.get("/ui", response_model=FastUI, response_model_exclude_none=True)
 async def fastui_dashboard_ui_api(
     kucoin_client: KucoinFuturesClient = Depends(get_kucoin_client)
@@ -37,11 +39,11 @@ class DashboardData(BaseModel):
     account_overview: Optional[List[AccountBalance]] = None
     error_message: Optional[str] = None
 
-@router.get("/ui", response_model=FastUI, response_model_exclude_none=True)
+@router.get("/ui")
 async def fastui_dashboard_ui_api(
     kucoin_client: KucoinFuturesClient = Depends(get_kucoin_client),
     db: AsyncSession = Depends(get_db_session)
-) -> FastUI:
+):
     components = await fastui_dashboard_root_api(kucoin_client)
     # دریافت bot settings و افزودن به متادیتا
     try:
@@ -58,7 +60,8 @@ async def fastui_dashboard_ui_api(
             )
     except Exception as e:
         settings = None
-    return FastUI(components=components, metadata={"bot_settings": settings.dict() if settings else {}})
+    fastui_obj = FastUI(components=components, metadata={"bot_settings": settings.dict() if settings else {}})
+    return JSONResponse(content=jsonable_encoder(fastui_obj))
 
 
     # Graceful error handling for Kucoin client and account overview
