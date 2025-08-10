@@ -16,6 +16,10 @@ import logging
 
 from app.api.dependencies import get_kucoin_client
 from app.exchange_clients.kucoin_futures_client import KucoinFuturesClient
+from app.db.session import get_db_session
+from app.schemas.bot_settings import BotSettings as BotSettingsSchema
+from app.crud import crud_bot_settings
+from sqlalchemy.ext.asyncio import AsyncSession
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -33,12 +37,28 @@ class DashboardData(BaseModel):
     account_overview: Optional[List[AccountBalance]] = None
     error_message: Optional[str] = None
 
-@router.get("/", response_model=FastUI, response_model_exclude_none=True)
-async def fastui_dashboard_root_api(
-    kucoin_client: KucoinFuturesClient = Depends(get_kucoin_client)
-) -> List[AnyComponent]:
-    dashboard_data = DashboardData(last_update=datetime.now(timezone.utc).isoformat(timespec='seconds'))
-    logger.debug("FastUI: Entered dashboard_root_api")
+@router.get("/ui", response_model=FastUI, response_model_exclude_none=True)
+async def fastui_dashboard_ui_api(
+    kucoin_client: KucoinFuturesClient = Depends(get_kucoin_client),
+    db: AsyncSession = Depends(get_db_session)
+) -> FastUI:
+    components = await fastui_dashboard_root_api(kucoin_client)
+    # دریافت bot settings و افزودن به متادیتا
+    try:
+        settings = await crud_bot_settings.get_settings(db)
+        if not settings:
+            settings = BotSettingsSchema(
+                symbols_to_trade=[],
+                max_concurrent_trades=0,
+                trade_amount_mode="",
+                fixed_trade_amount_usd=0,
+                percentage_trade_amount=0,
+                daily_loss_limit_percentage=None,
+                updated_at=None
+            )
+    except Exception as e:
+        settings = None
+    return FastUI(components=components, metadata={"bot_settings": settings.dict() if settings else {}})
 
 
     # Graceful error handling for Kucoin client and account overview
