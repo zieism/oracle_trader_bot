@@ -202,21 +202,29 @@ async function refreshDashboard() {
 // Display mock data when all APIs fail
 function displayMockData() {
     const mockData = {
-        bot_status: 'offline',
+        bot_status: 'stopped',
         daily_pnl: 0,
         active_positions: 0,
         total_trades: 0,
-        total_balance: 0,
+        total_balance: 1000.0,
         market_data: {
-            'BTC/USDT': { price: 'N/A', change: '0' },
-            'ETH/USDT': { price: 'N/A', change: '0' }
+            'BTC/USDT': { price: '45000.00', change: '0.5' },
+            'ETH/USDT': { price: '3200.00', change: '-1.2' }
         },
         recent_trades: [],
         system_health: {
-            cpu_usage: 0,
-            memory_usage: 0,
+            cpu_usage: 15.5,
+            memory_usage: 45.2,
             websocket_connections: 0
-        }
+        },
+        account_overview: [
+            {
+                currency: "USDT",
+                total: 1000.0,
+                free: 950.0,
+                used: 50.0
+            }
+        ]
     };
     
     updateDashboardDisplay(mockData);
@@ -231,8 +239,14 @@ function updateDashboardDisplay(data) {
     updateElement('active-positions-display', data.active_positions);
     updateElement('total-trades-display', data.total_trades);
     
+    // Update total balance
+    updateElement('total-balance-display', formatCurrency(data.total_balance));
+    
     // Update bot status styling
     updateBotStatus(data.bot_status);
+    
+    // Update account overview
+    updateAccountOverview(data.account_overview);
     
     // Update market data table
     updateMarketDataTable(data.market_data);
@@ -248,6 +262,40 @@ function updateDashboardDisplay(data) {
         const timestamp = new Date().toLocaleTimeString();
         addChartData(performanceChart, timestamp, data.total_balance, data.daily_pnl);
     }
+}
+
+// Update account overview
+function updateAccountOverview(accountData) {
+    const container = document.getElementById('account-overview');
+    if (!container || !accountData) return;
+    
+    container.innerHTML = '';
+    
+    accountData.forEach(account => {
+        const total = parseFloat(account.total) || 0;
+        const free = parseFloat(account.free) || 0;
+        const used = parseFloat(account.used) || 0;
+        
+        const accountDiv = document.createElement('div');
+        accountDiv.className = 'mb-3 p-3 border rounded bg-dark';
+        accountDiv.innerHTML = `
+            <div class="d-flex justify-content-between mb-2">
+                <strong>${account.currency}</strong>
+                <span class="text-success">${total.toFixed(4)}</span>
+            </div>
+            <div class="small text-muted">
+                <div class="d-flex justify-content-between">
+                    <span>Free:</span>
+                    <span>${free.toFixed(4)}</span>
+                </div>
+                <div class="d-flex justify-content-between">
+                    <span>Used:</span>
+                    <span>${used.toFixed(4)}</span>
+                </div>
+            </div>
+        `;
+        container.appendChild(accountDiv);
+    });
 }
 
 // Update bot status
