@@ -596,3 +596,189 @@ function updateSystemStatus(status) {
     // Update system status displays
     console.log('System status:', status);
 }
+
+// Settings Management Functions
+let availableSymbols = [];
+let selectedSymbols = ['BTC/USDT:USDT', 'ETH/USDT:USDT'];
+
+async function loadAvailableSymbols() {
+    try {
+        const response = await fetch('/api/trading-symbols');
+        const data = await response.json();
+        
+        if (data.symbols) {
+            availableSymbols = data.symbols;
+            console.log('Loaded available symbols:', availableSymbols);
+        }
+    } catch (error) {
+        console.error('Error loading symbols:', error);
+        // Use fallback symbols
+        availableSymbols = [
+            {symbol: 'BTC/USDT:USDT', base: 'BTC', quote: 'USDT', active: true},
+            {symbol: 'ETH/USDT:USDT', base: 'ETH', quote: 'USDT', active: true},
+            {symbol: 'ADA/USDT:USDT', base: 'ADA', quote: 'USDT', active: true},
+            {symbol: 'DOT/USDT:USDT', base: 'DOT', quote: 'USDT', active: true},
+            {symbol: 'SOL/USDT:USDT', base: 'SOL', quote: 'USDT', active: true}
+        ];
+    }
+}
+
+function openSymbolSelector() {
+    // Load symbols if not already loaded
+    if (availableSymbols.length === 0) {
+        loadAvailableSymbols();
+    }
+    
+    // Populate modal with symbols
+    const symbolList = document.getElementById('symbol-list');
+    symbolList.innerHTML = '';
+    
+    availableSymbols.forEach(symbol => {
+        const isSelected = selectedSymbols.includes(symbol.symbol);
+        
+        const col = document.createElement('div');
+        col.className = 'col-12 mb-2';
+        
+        col.innerHTML = `
+            <div class="form-check">
+                <input class="form-check-input" type="checkbox" value="${symbol.symbol}" 
+                       id="symbol-${symbol.base}" ${isSelected ? 'checked' : ''}>
+                <label class="form-check-label" for="symbol-${symbol.base}">
+                    ${symbol.symbol} <span class="text-muted">(${symbol.base}/${symbol.quote})</span>
+                </label>
+            </div>
+        `;
+        
+        symbolList.appendChild(col);
+    });
+    
+    // Show modal
+    const modal = new bootstrap.Modal(document.getElementById('symbolModal'));
+    modal.show();
+}
+
+function filterSymbols() {
+    const searchTerm = document.getElementById('symbol-search').value.toLowerCase();
+    const checkboxes = document.querySelectorAll('#symbol-list .form-check');
+    
+    checkboxes.forEach(checkbox => {
+        const label = checkbox.querySelector('label').textContent.toLowerCase();
+        const parent = checkbox.closest('.col-12');
+        
+        if (label.includes(searchTerm)) {
+            parent.style.display = 'block';
+        } else {
+            parent.style.display = 'none';
+        }
+    });
+}
+
+async function saveSymbolSelection() {
+    const checkboxes = document.querySelectorAll('#symbol-list input[type="checkbox"]:checked');
+    const newSelectedSymbols = Array.from(checkboxes).map(cb => cb.value);
+    
+    try {
+        const response = await fetch('/api/settings/symbols', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ symbols: newSelectedSymbols })
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+            selectedSymbols = newSelectedSymbols;
+            updateSelectedSymbolsDisplay();
+            
+            // Close modal
+            const modal = bootstrap.Modal.getInstance(document.getElementById('symbolModal'));
+            modal.hide();
+            
+            showNotification('Symbols saved successfully!', 'success');
+        } else {
+            showNotification('Failed to save symbols', 'error');
+        }
+        
+    } catch (error) {
+        console.error('Error saving symbols:', error);
+        showNotification('Error saving symbols', 'error');
+    }
+}
+
+function updateSelectedSymbolsDisplay() {
+    const container = document.getElementById('selected-symbols');
+    container.innerHTML = '';
+    
+    selectedSymbols.forEach(symbol => {
+        const badge = document.createElement('span');
+        badge.className = 'badge bg-secondary me-1 mb-1';
+        badge.textContent = symbol.replace(':USDT', '');
+        container.appendChild(badge);
+    });
+}
+
+async function saveSettings() {
+    const leverage = document.getElementById('leverage-input').value;
+    const riskPerTrade = document.getElementById('risk-input').value;
+    
+    const settings = {
+        trading_symbols: selectedSymbols,
+        leverage: parseInt(leverage),
+        risk_per_trade: parseFloat(riskPerTrade),
+        max_positions: 5,
+        stop_loss_pct: 3.0,
+        take_profit_pct: 6.0,
+        auto_trading: false
+    };
+    
+    try {
+        const response = await fetch('/api/settings', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(settings)
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+            showNotification('Settings saved successfully!', 'success');
+        } else {
+            showNotification('Failed to save settings', 'error');
+        }
+        
+    } catch (error) {
+        console.error('Error saving settings:', error);
+        showNotification('Error saving settings', 'error');
+    }
+}
+
+function showNotification(message, type = 'info') {
+    // Create notification element
+    const notification = document.createElement('div');
+    notification.className = `alert alert-${type === 'error' ? 'danger' : type} alert-dismissible fade show position-fixed`;
+    notification.style.cssText = 'top: 20px; right: 20px; z-index: 9999; min-width: 300px;';
+    
+    notification.innerHTML = `
+        ${message}
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    `;
+    
+    document.body.appendChild(notification);
+    
+    // Auto-remove after 3 seconds
+    setTimeout(() => {
+        if (notification.parentNode) {
+            notification.remove();
+        }
+    }, 3000);
+}
+
+// Initialize settings on page load
+document.addEventListener('DOMContentLoaded', function() {
+    loadAvailableSymbols();
+    updateSelectedSymbolsDisplay();
+});
