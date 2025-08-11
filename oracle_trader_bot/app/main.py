@@ -33,6 +33,7 @@ from app.api.endpoints import server_logs_api as server_logs_router
 from app.api.endpoints import analysis_logs_websocket as analysis_logs_router # ADDED: Import new analysis logs websocket router
 from app.api.endpoints import phase3_monitoring as phase3_monitoring_router # ADDED: Import new Phase 3 monitoring router
 from app.api.endpoints import social_trading as social_trading_router # ADDED: Import new social trading router
+from app.api.endpoints.health_simple import health_router # ADDED: Simple health check
 
 # Import dashboard components
 from app.dashboard import dashboard_router, dashboard_websocket_router
@@ -231,6 +232,9 @@ app.include_router(server_logs_router.router, prefix="/api/v1/logs", tags=["Serv
 app.include_router(analysis_logs_router.router, prefix="/api/v1", tags=["Analysis Logs (WebSocket)"]) # ADDED: Include new analysis logs router
 app.include_router(phase3_monitoring_router.router, prefix="/api/v1/phase3", tags=["Phase 3 Monitoring & Management"]) # ADDED: Include Phase 3 monitoring router
 app.include_router(social_trading_router.router, prefix="/api/v1/social", tags=["Social Trading & Community"]) # ADDED: Include social trading router
+
+# Include simple health check
+app.include_router(health_router, tags=["Health Check"])
 
 # Include dashboard routes
 app.include_router(dashboard_router, prefix="/dashboard", tags=["Real-Time Dashboard"])
