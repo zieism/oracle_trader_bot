@@ -296,15 +296,17 @@ function updateMarketDataTable(marketData) {
     
     Object.entries(marketData).forEach(([symbol, data]) => {
         const row = document.createElement('tr');
-        const changeClass = data.change >= 0 ? 'text-success' : 'text-danger';
-        const changeIcon = data.change >= 0 ? 'bi-arrow-up' : 'bi-arrow-down';
+        const price = parseFloat(data.price) || 0;
+        const change = parseFloat(data.change) || 0;
+        const changeClass = change >= 0 ? 'text-success' : 'text-danger';
+        const changeIcon = change >= 0 ? 'bi-arrow-up' : 'bi-arrow-down';
         
         row.innerHTML = `
             <td>${symbol}</td>
-            <td>$${data.price.toFixed(2)}</td>
+            <td>$${price.toFixed(2)}</td>
             <td class="${changeClass}">
                 <i class="bi ${changeIcon} me-1"></i>
-                ${Math.abs(data.change).toFixed(2)}%
+                ${Math.abs(change).toFixed(2)}%
             </td>
             <td>
                 <span class="badge bg-success">Active</span>
