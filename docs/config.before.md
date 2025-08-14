@@ -1,0 +1,92 @@
+# Configuration Inventory (Before Refactor)
+
+## Settings Fields
+- **PROJECT_NAME**: `str` = `"Oracle Trader Bot"`
+- **DEBUG**: `bool` = `False`
+- **KUCOIN_API_BASE_URL**: `str` = `"https://api-futures.kucoin.com"`
+- **SYMBOLS_TO_TRADE_BOT**: `List[str]` = `Field(default_factory=lambda: ["BTC/USDT:USDT", "ETH/USDT:USDT"], json_loads=True)`
+- **PRIMARY_TIMEFRAME_BOT**: `str` = `"1h"`
+- **CANDLE_LIMIT_BOT**: `int` = `200`
+- **LOOP_SLEEP_DURATION_SECONDS_BOT**: `int` = `300`
+- **DELAY_BETWEEN_SYMBOL_PROCESSING_SECONDS_BOT**: `int` = `5`
+- **FIXED_USD_AMOUNT_PER_TRADE**: `float` = `10.0`
+- **BOT_DEFAULT_LEVERAGE**: `int` = `5`
+- **MAX_CONCURRENT_TRADES_BOT_CONFIG**: `int` = `3`
+- **TRADE_AMOUNT_MODE_BOT_CONFIG**: `str` = `"FIXED_USD"`
+- **PERCENTAGE_TRADE_AMOUNT_BOT_CONFIG**: `float` = `1.0`
+- **DAILY_LOSS_LIMIT_PERCENTAGE_BOT_CONFIG**: `Optional[float]` = `None`
+- **REGIME_ADX_PERIOD**: `int` = `14`
+- **REGIME_ADX_WEAK_TREND_THRESHOLD**: `float` = `20.0`
+- **REGIME_ADX_STRONG_TREND_THRESHOLD**: `float` = `25.0`
+- **REGIME_BBW_PERIOD**: `int` = `20`
+- **REGIME_BBW_STD_DEV**: `float` = `2.0`
+- **REGIME_BBW_LOW_THRESHOLD**: `float` = `0.03`
+- **REGIME_BBW_HIGH_THRESHOLD**: `float` = `0.10`
+- **TREND_EMA_FAST_PERIOD**: `int` = `10`
+- **TREND_EMA_MEDIUM_PERIOD**: `int` = `20`
+- **TREND_EMA_SLOW_PERIOD**: `int` = `50`
+- **TREND_RSI_PERIOD**: `int` = `14`
+- **TREND_RSI_OVERBOUGHT**: `int` = `70`
+- **TREND_RSI_OVERSOLD**: `int` = `30`
+- **TREND_RSI_BULL_ZONE_MIN**: `int` = `50`
+- **TREND_RSI_BEAR_ZONE_MAX**: `int` = `50`
+- **TREND_MACD_FAST**: `int` = `12`
+- **TREND_MACD_SLOW**: `int` = `26`
+- **TREND_MACD_SIGNAL**: `int` = `9`
+- **TREND_ATR_PERIOD_SL_TP**: `int` = `14`
+- **TREND_ATR_MULTIPLIER_SL**: `float` = `1.5`
+- **TREND_TP_RR_RATIO**: `float` = `2.0`
+- **TREND_MIN_SIGNAL_STRENGTH**: `float` = `0.5`
+- **TREND_LEVERAGE_TIERS_JSON**: `str` = `'[{"threshold": 0.5, "leverage": 5}, {"threshold": 0.7, "leverage": 10}, {"threshold": 0.9, "leverage": 15}]'`
+- **RANGE_RSI_PERIOD**: `int` = `14`
+- **RANGE_RSI_OVERBOUGHT**: `int` = `70`
+- **RANGE_RSI_OVERSOLD**: `int` = `30`
+- **RANGE_BBANDS_PERIOD**: `int` = `20`
+- **RANGE_BBANDS_STD_DEV**: `float` = `2.0`
+- **RANGE_ATR_PERIOD_SL_TP**: `int` = `14`
+- **RANGE_ATR_MULTIPLIER_SL**: `float` = `1.0`
+- **RANGE_TP_RR_RATIO**: `float` = `1.5`
+- **RANGE_MIN_SIGNAL_STRENGTH**: `float` = `0.8`
+- **RANGE_LEVERAGE_TIERS_JSON**: `str` = `'[{"threshold": 0.8, "leverage": 3}, {"threshold": 0.95, "leverage": 5}]'`
+- **LOG_DIR**: `str` = `os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "logs")`
+- **BOT_ENGINE_LOG_FILE**: `str` = `"bot_engine.log"`
+- **API_SERVER_LOG_FILE**: `str` = `"api_server.log"`
+- **MAX_LOG_FILE_SIZE_MB**: `int` = `5 # 5 MB`
+- **LOG_FILE_BACKUP_COUNT**: `int` = `5 # Keep 5 backup log files`
+- **TREND_LEVERAGE_TIERS**: `List[Tuple[float, int]]` = `Field(default_factory=list, validate_default=False)`
+- **RANGE_LEVERAGE_TIERS**: `List[Tuple[float, int]]` = `Field(default_factory=list, validate_default=False)`
+
+## API Keys & Credentials
+- **KUCOIN_API_KEY**: `Optional[str]` = `None`
+- **KUCOIN_API_SECRET**: `Optional[str]` = `None`
+- **KUCOIN_API_PASSPHRASE**: `Optional[str]` = `None`
+- **POSTGRES_PASSWORD**: `str` = `***MASKED***`
+
+## Database Configuration
+- **POSTGRES_SERVER**: `str` = `"localhost"`
+- **POSTGRES_PORT**: `str` = `"5432"`
+- **POSTGRES_USER**: `str` = `"youruser" # Replace with your actual user`
+- **POSTGRES_DB**: `str` = `"yourdb" # Replace with your actual db name`
+
+## Hardcoded URLs Found
+- `http://localhost` in main.py
+- `http://localhost:5173` in main.py
+- `http://localhost:3000` in main.py
+- `http://localhost:8080` in main.py
+- `http://localhost:4173` in main.py
+- `http://{SERVER_PUBLIC_IP}:5173` in main.py
+- `http://{SERVER_PUBLIC_IP}` in main.py
+- `http://{SERVER_PUBLIC_IP}:5174` in main.py
+- `http://{SERVER_PUBLIC_IP}:3000` in main.py
+- `https://{SERVER_PUBLIC_IP}` in main.py
+- `https://localhost:5173` in main.py
+- `http://127.0.0.1:5173` in main.py
+- `http://127.0.0.1:3000` in main.py
+- `localhost:5173` in main.py
+- `localhost:3000` in main.py
+- `localhost:8080` in main.py
+- `localhost:4173` in main.py
+- `127.0.0.1:5173` in main.py
+- `127.0.0.1:3000` in main.py
+- `http://150.241.85.30:8000/api/v1` in apiService.ts
+- `ws://150.241.85.30:8000/api/v1` in apiService.ts

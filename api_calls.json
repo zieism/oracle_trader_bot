@@ -1,0 +1,86 @@
+[
+  {
+    "method": "GET",
+    "url": "/exchange/kucoin/account-overview",
+    "file": "oracle-trader-frontend\\src\\services\\apiService.ts",
+    "line": 46,
+    "type": "apiClient"
+  },
+  {
+    "method": "GET",
+    "url": "/bot-settings/",
+    "file": "oracle-trader-frontend\\src\\services\\apiService.ts",
+    "line": 104,
+    "type": "apiClient"
+  },
+  {
+    "method": "PUT",
+    "url": "/bot-settings/",
+    "file": "oracle-trader-frontend\\src\\services\\apiService.ts",
+    "line": 116,
+    "type": "apiClient"
+  },
+  {
+    "method": "GET",
+    "url": "/db/trades/?skip=${skip}&limit=${limit}",
+    "file": "oracle-trader-frontend\\src\\services\\apiService.ts",
+    "line": 145,
+    "type": "apiClient"
+  },
+  {
+    "method": "GET",
+    "url": "/db/trades/total-count",
+    "file": "oracle-trader-frontend\\src\\services\\apiService.ts",
+    "line": 157,
+    "type": "apiClient"
+  },
+  {
+    "method": "POST",
+    "url": "/orders/positions/close",
+    "file": "oracle-trader-frontend\\src\\services\\apiService.ts",
+    "line": 221,
+    "type": "apiClient"
+  },
+  {
+    "method": "GET",
+    "url": "/exchange/kucoin/contracts",
+    "file": "oracle-trader-frontend\\src\\services\\apiService.ts",
+    "line": 236,
+    "type": "apiClient"
+  },
+  {
+    "method": "GET",
+    "url": "/exchange/health",
+    "file": "oracle-trader-frontend\\src\\services\\apiService.ts",
+    "line": 258,
+    "type": "apiClient"
+  },
+  {
+    "method": "GET",
+    "url": "/exchange/symbols",
+    "file": "oracle-trader-frontend\\src\\services\\apiService.ts",
+    "line": 274,
+    "type": "apiClient"
+  },
+  {
+    "method": "GET",
+    "url": "/bot-management/status",
+    "file": "oracle-trader-frontend\\src\\services\\apiService.ts",
+    "line": 294,
+    "type": "apiClient"
+  },
+  {
+    "method": "POST",
+    "url": "/bot-management/start",
+    "file": "oracle-trader-frontend\\src\\services\\apiService.ts",
+    "line": 305,
+    "type": "apiClient"
+  },
+  {
+    "method": "POST",
+    "url": "/bot-management/stop",
+    "file": "oracle-trader-frontend\\src\\services\\apiService.ts",
+    "line": 316,
+    "type": "apiClient"
+  }
+]
