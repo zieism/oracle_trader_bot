@@ -1,0 +1,366 @@
+# .github/workflows/release.yml - Automated Release Pipeline
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Tag to create release for'
+        required: true
+        type: string
+
+permissions:
+  contents: write
+  packages: read
+  deployments: write
+
+jobs:
+  # ==================== VALIDATE RELEASE ====================
+  validate-release:
+    name: Validate Release
+    runs-on: ubuntu-latest
+
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      is-prerelease: ${{ steps.version.outputs.prerelease }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Get version from tag
+        id: version
+        run: |
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            TAG="${{ github.event.inputs.tag }}"
+          else
+            TAG="${{ github.ref_name }}"
+          fi
+          
+          echo "Working with tag: $TAG"
+          
+          # Extract version (remove 'v' prefix)
+          VERSION=${TAG#v}
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          
+          # Check if it's a prerelease (contains alpha, beta, rc)
+          if [[ $VERSION =~ (alpha|beta|rc) ]]; then
+            echo "prerelease=true" >> $GITHUB_OUTPUT
+            echo "This is a prerelease: $VERSION"
+          else
+            echo "prerelease=false" >> $GITHUB_OUTPUT
+            echo "This is a stable release: $VERSION"
+          fi
+
+      - name: Validate CHANGELOG.md exists
+        run: |
+          if [[ ! -f "CHANGELOG.md" ]]; then
+            echo "❌ CHANGELOG.md not found!"
+            exit 1
+          fi
+          echo "✅ CHANGELOG.md found"
+
+      - name: Check if version exists in CHANGELOG
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          if ! grep -q "v$VERSION" CHANGELOG.md; then
+            echo "⚠️  Version v$VERSION not found in CHANGELOG.md"
+            echo "Creating generic release notes..."
+          else
+            echo "✅ Version v$VERSION found in CHANGELOG.md"
+          fi
+
+  # ==================== EXTRACT RELEASE NOTES ====================
+  extract-notes:
+    name: Extract Release Notes
+    runs-on: ubuntu-latest
+    needs: validate-release
+
+    outputs:
+      release-notes: ${{ steps.notes.outputs.notes }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Extract release notes from CHANGELOG
+        id: notes
+        run: |
+          VERSION="${{ needs.validate-release.outputs.version }}"
+          
+          # Try to extract notes for this version from CHANGELOG.md
+          if grep -q "v$VERSION" CHANGELOG.md; then
+            echo "Extracting release notes for v$VERSION from CHANGELOG.md..."
+            
+            # Create a temporary file for the notes
+            NOTES_FILE=$(mktemp)
+            
+            # Extract content between version headers
+            awk "
+              /^## .*v$VERSION/ { found=1; next }
+              found && /^## / { found=0 }
+              found { print }
+            " CHANGELOG.md > "$NOTES_FILE"
+            
+            # If we found content, use it
+            if [[ -s "$NOTES_FILE" ]]; then
+              echo "✅ Release notes extracted from CHANGELOG.md"
+              {
+                echo 'notes<<EOF'
+                cat "$NOTES_FILE"
+                echo 'EOF'
+              } >> $GITHUB_OUTPUT
+            else
+              echo "⚠️  No content found for v$VERSION in CHANGELOG.md"
+              echo "notes=## Release v$VERSION" >> $GITHUB_OUTPUT
+            fi
+            
+            rm "$NOTES_FILE"
+          else
+            echo "⚠️  Version v$VERSION not found in CHANGELOG.md, creating generic notes"
+            echo "notes=## Release v$VERSION" >> $GITHUB_OUTPUT
+          fi
+
+  # ==================== BUILD ASSETS ====================
+  build-assets:
+    name: Build Release Assets
+    runs-on: ubuntu-latest
+    needs: validate-release
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+          cache-dependency-path: oracle-trader-frontend/package-lock.json
+
+      - name: Build backend package
+        run: |
+          cd oracle_trader_bot
+          pip install build
+          python -m build --sdist --wheel
+
+      - name: Build frontend assets
+        env:
+          VITE_API_BASE_URL: /api/v1
+          VITE_WS_BASE_URL: /api/v1
+        run: |
+          cd oracle-trader-frontend
+          npm ci
+          npm run build
+          
+          # Create frontend distribution archive
+          cd dist
+          tar -czf ../../oracle-trader-frontend-v${{ needs.validate-release.outputs.version }}.tar.gz .
+          cd ..
+
+      - name: Create deployment package
+        run: |
+          VERSION="${{ needs.validate-release.outputs.version }}"
+          
+          # Create deployment directory
+          mkdir -p release-package
+          
+          # Copy essential files
+          cp docker-compose.yml release-package/
+          cp docker-compose.dev.yml release-package/
+          cp .env.docker.example release-package/.env.example
+          cp Makefile release-package/
+          cp README.docker.md release-package/
+          cp -r nginx/ release-package/
+          cp -r init-db/ release-package/
+          cp docs/ release-package/ -r
+          
+          # Create deployment archive
+          tar -czf oracle-trader-bot-deployment-v$VERSION.tar.gz -C release-package .
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: release-assets
+          path: |
+            oracle_trader_bot/dist/*
+            oracle-trader-frontend-v*.tar.gz
+            oracle-trader-bot-deployment-v*.tar.gz
+          retention-days: 30
+
+  # ==================== CREATE GITHUB RELEASE ====================
+  create-release:
+    name: Create GitHub Release
+    runs-on: ubuntu-latest
+    needs: [validate-release, extract-notes, build-assets]
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Download build artifacts
+        uses: actions/download-artifact@v3
+        with:
+          name: release-assets
+          path: ./release-assets
+
+      - name: Create GitHub Release
+        id: create-release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ github.ref_name || github.event.inputs.tag }}
+          release_name: Oracle Trader Bot ${{ github.ref_name || github.event.inputs.tag }}
+          body: |
+            ${{ needs.extract-notes.outputs.release-notes }}
+            
+            ---
+            
+            ## 📦 Installation
+            
+            ### Docker Deployment (Recommended)
+            ```bash
+            # Download deployment package
+            wget https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name || github.event.inputs.tag }}/oracle-trader-bot-deployment-v${{ needs.validate-release.outputs.version }}.tar.gz
+            
+            # Extract and setup
+            tar -xzf oracle-trader-bot-deployment-v${{ needs.validate-release.outputs.version }}.tar.gz
+            cp .env.example .env
+            # Edit .env with your configuration
+            
+            # Deploy with Docker
+            make init
+            make build 
+            make prod-up
+            ```
+            
+            ### Container Images
+            - **Backend**: `ghcr.io/${{ github.repository }}/backend:${{ github.ref_name || github.event.inputs.tag }}`
+            - **Frontend**: `ghcr.io/${{ github.repository }}/frontend:${{ github.ref_name || github.event.inputs.tag }}`
+            
+            ## 📋 What's Changed
+            
+            See [CHANGELOG.md](https://github.com/${{ github.repository }}/blob/${{ github.ref_name || github.event.inputs.tag }}/CHANGELOG.md) for detailed changes.
+            
+            ## 🔗 Documentation
+            
+            - [Setup Guide](https://github.com/${{ github.repository }}/blob/${{ github.ref_name || github.event.inputs.tag }}/docs/SETUP.md)
+            - [Architecture](https://github.com/${{ github.repository }}/blob/${{ github.ref_name || github.event.inputs.tag }}/docs/ARCHITECTURE.md)
+            - [Docker Deployment](https://github.com/${{ github.repository }}/blob/${{ github.ref_name || github.event.inputs.tag }}/README.docker.md)
+            - [Troubleshooting](https://github.com/${{ github.repository }}/blob/${{ github.ref_name || github.event.inputs.tag }}/docs/TROUBLESHOOTING.md)
+          draft: false
+          prerelease: ${{ needs.validate-release.outputs.is-prerelease == 'true' }}
+
+      - name: Upload deployment package
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create-release.outputs.upload_url }}
+          asset_path: ./release-assets/oracle-trader-bot-deployment-v${{ needs.validate-release.outputs.version }}.tar.gz
+          asset_name: oracle-trader-bot-deployment-v${{ needs.validate-release.outputs.version }}.tar.gz
+          asset_content_type: application/gzip
+
+      - name: Upload frontend build
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create-release.outputs.upload_url }}
+          asset_path: ./release-assets/oracle-trader-frontend-v${{ needs.validate-release.outputs.version }}.tar.gz
+          asset_name: oracle-trader-frontend-v${{ needs.validate-release.outputs.version }}.tar.gz
+          asset_content_type: application/gzip
+
+      - name: Upload backend wheel (if exists)
+        continue-on-error: true
+        run: |
+          WHEEL_FILE=$(find ./release-assets -name "*.whl" | head -1)
+          if [[ -n "$WHEEL_FILE" ]]; then
+            curl -X POST \
+              -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+              -H "Content-Type: application/octet-stream" \
+              --data-binary "@$WHEEL_FILE" \
+              "${{ steps.create-release.outputs.upload_url }}?name=$(basename $WHEEL_FILE)&label=Backend Python Package"
+          fi
+
+  # ==================== POST-RELEASE ACTIONS ====================
+  post-release:
+    name: Post-Release Actions
+    runs-on: ubuntu-latest
+    needs: [create-release, validate-release]
+    if: needs.validate-release.outputs.is-prerelease == 'false'
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Update documentation badges
+        run: |
+          # Update README badges with latest release version
+          VERSION="${{ needs.validate-release.outputs.version }}"
+          
+          if [[ -f README.md ]]; then
+            sed -i "s/release-v[0-9]\+\.[0-9]\+\.[0-9]\+/release-v$VERSION/g" README.md
+            
+            if git diff --quiet README.md; then
+              echo "No README.md changes needed"
+            else
+              git config --local user.email "action@github.com"
+              git config --local user.name "GitHub Action"
+              git add README.md
+              git commit -m "docs: update release badges to v$VERSION [skip ci]"
+              git push origin HEAD:${{ github.event.repository.default_branch }} || echo "Push failed, continuing..."
+            fi
+          fi
+
+      - name: Create discussion
+        continue-on-error: true
+        run: |
+          # Could create a GitHub Discussion for the release
+          echo "Release v${{ needs.validate-release.outputs.version }} published! 🎉"
+          
+          # You could use GitHub CLI here to create discussions
+          # gh discussion create --title "Release v$VERSION" --body "..." --category "Announcements"
+
+  # ==================== NOTIFICATION ====================
+  notify:
+    name: Notify Release
+    runs-on: ubuntu-latest
+    needs: [create-release, validate-release]
+    if: always() && needs.create-release.result == 'success'
+
+    steps:
+      - name: Send release notification
+        run: |
+          echo "## 🚀 Release Published Successfully!" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Oracle Trader Bot v${{ needs.validate-release.outputs.version }}** has been released!" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 📦 Release Assets:" >> $GITHUB_STEP_SUMMARY
+          echo "- Docker images published to GHCR" >> $GITHUB_STEP_SUMMARY
+          echo "- Deployment package available" >> $GITHUB_STEP_SUMMARY
+          echo "- Frontend build artifacts included" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 🔗 Links:" >> $GITHUB_STEP_SUMMARY
+          echo "- [Release Page](https://github.com/${{ github.repository }}/releases/tag/${{ github.ref_name || github.event.inputs.tag }})" >> $GITHUB_STEP_SUMMARY
+          echo "- [Docker Images](https://github.com/${{ github.repository }}/pkgs/container/oracle_trader_bot)" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          if [[ "${{ needs.validate-release.outputs.is-prerelease }}" == "true" ]]; then
+            echo "🧪 **This is a pre-release** - use for testing only" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "✅ **This is a stable release** - ready for production!" >> $GITHUB_STEP_SUMMARY
+          fi
