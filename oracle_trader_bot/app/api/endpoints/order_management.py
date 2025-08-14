@@ -49,6 +49,12 @@ async def get_order_status_endpoint(
             )
         logger.info(f"OrderManagement: Successfully fetched status for order ID '{order_id}'. Status: {order.get('status')}")
         return order
+    except KucoinAuthError as e:
+        logger.warning(f"OrderManagement: No credentials available for order status check: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail={"ok": False, "reason": "missing_credentials", "message": "Order status requires API credentials"}
+        )
     except KucoinRequestError as e:
         logger.error(f"OrderManagement: KucoinRequestError fetching order {order_id} for {symbol}: {e}", exc_info=True)
         original_error = e.__cause__ or e.__context__
@@ -89,6 +95,12 @@ async def cancel_order_endpoint(
         
         logger.info(f"OrderManagement: Cancellation attempt for order ID '{order_id}' processed. Response: {response}")
         return response
+    except KucoinAuthError as e:
+        logger.warning(f"OrderManagement: No credentials available for order cancellation: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail={"ok": False, "reason": "missing_credentials", "message": "Order cancellation requires API credentials"}
+        )
     except KucoinRequestError as e:
         logger.error(f"OrderManagement: KucoinRequestError cancelling order {order_id} for {symbol}: {e}", exc_info=True)
         original_error = e.__cause__ or e.__context__
@@ -216,15 +228,18 @@ async def get_open_positions_endpoint(
             
         logger.info(f"OrderManagement: Successfully fetched and combined {len(combined_positions)} open position(s). Symbol filter: {symbol if symbol else 'All'}")
         return combined_positions
+    except KucoinAuthError as e:
+        logger.warning(f"OrderManagement: No credentials available for positions check: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail={"ok": False, "reason": "missing_credentials", "message": "Position data requires API credentials"}
+        )
     except KucoinRequestError as e: 
         logger.error(f"OrderManagement: KucoinRequestError fetching positions (symbol: {symbol}): {e}", exc_info=True)
         original_error = e.__cause__ or e.__context__
         if isinstance(original_error, ccxt.BadSymbol) or "Invalid symbol" in str(e): 
              raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Invalid symbol provided: {symbol}")
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
-    except KucoinAuthError as e:
-        logger.error(f"OrderManagement: KucoinAuthError fetching positions (symbol: {symbol}): {e}", exc_info=True)
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=str(e))
     except Exception as e:
         logger.error(f"OrderManagement: Unexpected error fetching open positions (symbol: {symbol}): {e}", exc_info=True)
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Unexpected error: {str(e)}")

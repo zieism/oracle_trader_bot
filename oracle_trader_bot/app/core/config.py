@@ -7,13 +7,45 @@ import os # Import os module
 
 class Settings(BaseSettings):
     PROJECT_NAME: str = "Oracle Trader Bot"
+    VERSION: str = "1.0.0"
     DEBUG: bool = False
+
+    # App Startup Mode Settings
+    APP_STARTUP_MODE: str = Field(default="lite", description="Startup mode: 'lite' (DB optional) or 'full' (DB required)")
+    SKIP_DB_INIT: bool = Field(default=True, description="Skip DB initialization on startup")
+
+    @model_validator(mode='after')
+    def _validate_startup_mode(cls, instance: 'Settings') -> 'Settings':
+        """Validate startup mode and sync with SKIP_DB_INIT."""
+        if instance.APP_STARTUP_MODE not in ["lite", "full"]:
+            raise ValueError("APP_STARTUP_MODE must be 'lite' or 'full'")
+        
+        # Sync SKIP_DB_INIT with APP_STARTUP_MODE
+        if instance.APP_STARTUP_MODE == "lite":
+            instance.SKIP_DB_INIT = True
+        elif instance.APP_STARTUP_MODE == "full":
+            instance.SKIP_DB_INIT = False
+            
+        return instance
 
     # KuCoin API Credentials
     KUCOIN_API_KEY: Optional[str] = None
     KUCOIN_API_SECRET: Optional[str] = None
     KUCOIN_API_PASSPHRASE: Optional[str] = None
-    KUCOIN_API_BASE_URL: str = "https://api-futures.kucoin.com" 
+    KUCOIN_API_BASE_URL: str = "https://api-futures.kucoin.com"
+    KUCOIN_SANDBOX: bool = Field(default=False, description="Use KuCoin sandbox environment")
+
+    def has_exchange_credentials(self) -> bool:
+        """Check if all required KuCoin API credentials are available."""
+        return all([
+            self.KUCOIN_API_KEY,
+            self.KUCOIN_API_SECRET, 
+            self.KUCOIN_API_PASSPHRASE
+        ])
+
+    def is_sandbox(self) -> bool:
+        """Check if running in sandbox mode."""
+        return self.KUCOIN_SANDBOX 
 
     # Database Credentials
     POSTGRES_SERVER: str = "localhost"
@@ -93,6 +125,20 @@ class Settings(BaseSettings):
     # These fields will hold the parsed list of tuples
     TREND_LEVERAGE_TIERS: List[Tuple[float, int]] = Field(default_factory=list, validate_default=False)
     RANGE_LEVERAGE_TIERS: List[Tuple[float, int]] = Field(default_factory=list, validate_default=False)
+
+    @model_validator(mode='after')
+    def _validate_startup_mode(cls, instance: 'Settings') -> 'Settings':
+        """Validate startup mode and sync with SKIP_DB_INIT."""
+        if instance.APP_STARTUP_MODE not in ["lite", "full"]:
+            raise ValueError("APP_STARTUP_MODE must be 'lite' or 'full'")
+        
+        # Sync SKIP_DB_INIT with APP_STARTUP_MODE
+        if instance.APP_STARTUP_MODE == "lite":
+            instance.SKIP_DB_INIT = True
+        elif instance.APP_STARTUP_MODE == "full":
+            instance.SKIP_DB_INIT = False
+            
+        return instance
 
     @model_validator(mode='after')
     def _parse_leverage_tiers_from_json(cls, instance: 'Settings') -> 'Settings':

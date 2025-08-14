@@ -25,14 +25,31 @@ class KucoinRequestError(KucoinClientException):
 class KucoinFuturesClient:
     def __init__(self, external_session: Optional[aiohttp.ClientSession] = None):
         self.exchange_id = 'kucoinfutures'
-        self.exchange_config = {
-            'apiKey': settings.KUCOIN_API_KEY,
-            'secret': settings.KUCOIN_API_SECRET,
-            'password': settings.KUCOIN_API_PASSPHRASE, 
-            'options': {
-                'defaultType': 'future',
-            },
-        }
+        self.has_credentials = settings.has_exchange_credentials()
+        self.is_sandbox = settings.is_sandbox()
+        
+        # Configure exchange based on credential availability
+        if self.has_credentials:
+            self.exchange_config = {
+                'apiKey': settings.KUCOIN_API_KEY,
+                'secret': settings.KUCOIN_API_SECRET,
+                'password': settings.KUCOIN_API_PASSPHRASE,
+                'sandbox': self.is_sandbox,
+                'options': {
+                    'defaultType': 'future',
+                },
+            }
+            self.auth_mode = 'auth'
+        else:
+            # Initialize in no-auth mode for public endpoints only
+            self.exchange_config = {
+                'sandbox': self.is_sandbox,
+                'options': {
+                    'defaultType': 'future',
+                },
+            }
+            self.auth_mode = 'no-auth'
+            
         if external_session:
             self.exchange_config['aiohttp_session'] = external_session
             self.manage_session_externally = True 
@@ -41,12 +58,33 @@ class KucoinFuturesClient:
 
         try:
             self.exchange = getattr(ccxt, self.exchange_id)(self.exchange_config)
-            self.markets_loaded = False 
-            if not all([settings.KUCOIN_API_KEY, settings.KUCOIN_API_SECRET, settings.KUCOIN_API_PASSPHRASE]):
-                print(f"WARNING ({self.__class__.__name__}): CCXT client for KuCoin Futures initialized with INCOMPLETE API credentials from settings. Authenticated calls will fail.")
+            self.markets_loaded = False
+            
+            # Log initialization mode
+            mode_info = f"mode={self.auth_mode}, sandbox={self.is_sandbox}"
+            if self.has_credentials:
+                print(f"INFO ({self.__class__.__name__}): KuCoin Futures client initialized with credentials ({mode_info})")
+            else:
+                print(f"INFO ({self.__class__.__name__}): KuCoin Futures client initialized in no-auth mode - only public endpoints available ({mode_info})")
+                
         except Exception as e:
             print(f"ERROR ({self.__class__.__name__}): Failed to initialize CCXT KuCoin Futures client: {e}")
             raise KucoinClientException(f"Failed to initialize CCXT KuCoin Futures client: {e}")
+
+    def _require_credentials(self, operation: str) -> None:
+        """Check if credentials are available for private operations."""
+        if not self.has_credentials:
+            print(f"WARN ({self.__class__.__name__}): Attempted {operation} without credentials")
+            raise KucoinAuthError(f"Missing credentials for {operation}")
+
+    def get_client_status(self) -> Dict[str, Any]:
+        """Get current client status information."""
+        return {
+            'ok': self.has_credentials,
+            'sandbox': self.is_sandbox,
+            'mode': self.auth_mode,
+            'reason': None if self.has_credentials else 'missing_credentials'
+        }
 
     async def _ensure_markets_loaded(self):
         if not self.markets_loaded:
@@ -158,6 +196,9 @@ class KucoinFuturesClient:
             return None
 
     async def get_account_overview(self, currency: Optional[str] = "USDT") -> Optional[Dict[str, Any]]:
+        """Fetch account balance information - requires credentials."""
+        self._require_credentials("fetching account overview")
+        
         context = f"fetching KuCoin account overview (currency: {currency})"
         try:
             balance_data = await self.exchange.fetch_balance() 
@@ -195,6 +236,9 @@ class KucoinFuturesClient:
         margin_mode: Optional[str] = 'isolated', 
         params: Optional[Dict[str, Any]] = None 
     ) -> Optional[Dict[str, Any]]:
+        """Create a futures order - requires credentials."""
+        self._require_credentials("creating futures order")
+        
         context = f"creating {side} {order_type} order for {amount} of {symbol}"
 
         if order_type.lower() == 'limit' and price is None:
@@ -374,6 +418,9 @@ class KucoinFuturesClient:
 
 
     async def fetch_order(self, order_id: str, symbol: str) -> Optional[Dict[str, Any]]:
+        """Fetch order information - requires credentials."""
+        self._require_credentials("fetching order information")
+        
         context = f"fetching order ID {order_id} for symbol {symbol}"
         await self._ensure_markets_loaded()
         try:
@@ -388,6 +435,9 @@ class KucoinFuturesClient:
             return None
 
     async def fetch_open_positions(self, symbol: Optional[str] = None) -> Optional[List[Dict[str, Any]]]:
+        """Fetch open positions - requires credentials."""
+        self._require_credentials("fetching open positions")
+        
         context = "fetching open positions"
         if symbol: context += f" for symbol {symbol}"
         await self._ensure_markets_loaded()
@@ -418,6 +468,9 @@ class KucoinFuturesClient:
             return None
 
     async def cancel_order_by_id(self, order_id: str, symbol: str) -> Optional[Dict[str, Any]]:
+        """Cancel an order by ID - requires credentials."""
+        self._require_credentials("cancelling order")
+        
         context = f"cancelling order ID {order_id}, symbol {symbol}"
         await self._ensure_markets_loaded()
         try:
@@ -437,6 +490,9 @@ class KucoinFuturesClient:
         position_amount: float, 
         current_position_side: str 
     ) -> Optional[Dict[str, Any]]:
+        """Close a market position - requires credentials."""
+        self._require_credentials("closing position")
+        
         context = f"closing {current_position_side} position for {position_amount} of {symbol} with market order"
         await self._ensure_markets_loaded()
         if position_amount <= 1e-9: 
@@ -470,6 +526,9 @@ class KucoinFuturesClient:
             return None
 
     async def fetch_open_stop_orders_for_symbol(self, symbol: str, since: Optional[int] = None, limit: Optional[int] = None) -> Optional[List[Dict[str, Any]]]:
+        """Fetch open stop orders for a symbol - requires credentials.""" 
+        self._require_credentials("fetching stop orders")
+        
         context = f"fetching open stop orders for symbol {symbol}"
         await self._ensure_markets_loaded()
         try:

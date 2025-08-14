@@ -23,11 +23,18 @@ async def get_bot_settings(db: AsyncSession) -> Optional[BotSettingsModel]:
         print(f"No bot settings found in DB with ID {BOT_SETTINGS_ID}, creating with defaults.")
         # Create with defaults from the global app settings or Pydantic model defaults
         default_settings_data = BotSettingsCreate(
-            max_concurrent_trades=global_app_settings.MAX_CONCURRENT_TRADES_BOT_CONFIG if hasattr(global_app_settings, 'MAX_CONCURRENT_TRADES_BOT_CONFIG') else 3, # Example
-            trade_amount_mode=TradeAmountMode.FIXED_USD, # Default mode
-            fixed_trade_amount_usd=global_app_settings.FIXED_USD_AMOUNT_PER_TRADE, # From global settings
-            percentage_trade_amount=global_app_settings.PERCENTAGE_TRADE_AMOUNT_BOT_CONFIG if hasattr(global_app_settings, 'PERCENTAGE_TRADE_AMOUNT_BOT_CONFIG') else 1.0, # Example
-            daily_loss_limit_percentage=global_app_settings.DAILY_LOSS_LIMIT_PERCENTAGE_BOT_CONFIG if hasattr(global_app_settings, 'DAILY_LOSS_LIMIT_PERCENTAGE_BOT_CONFIG') else None # Example
+            symbols_to_trade=global_app_settings.SYMBOLS_TO_TRADE_BOT,
+            max_concurrent_trades=getattr(global_app_settings, 'MAX_CONCURRENT_TRADES_BOT_CONFIG', 3),
+            trade_amount_mode=TradeAmountMode.FIXED_USD,
+            fixed_trade_amount_usd=global_app_settings.FIXED_USD_AMOUNT_PER_TRADE,
+            percentage_trade_amount=getattr(global_app_settings, 'PERCENTAGE_TRADE_AMOUNT_BOT_CONFIG', 1.0),
+            daily_loss_limit_percentage=getattr(global_app_settings, 'DAILY_LOSS_LIMIT_PERCENTAGE_BOT_CONFIG', None),
+            kucoin_sandbox_mode=True,
+            leverage=getattr(global_app_settings, 'BOT_DEFAULT_LEVERAGE', 5),
+            risk_per_trade=1.0,
+            atr_based_tp_enabled=True,
+            atr_based_sl_enabled=True,
+            timeframes=["1h", "4h"]
         )
         # Ensure all fields in BotSettingsModel are covered by BotSettingsCreate defaults
         # or explicitly set here if BotSettingsCreate doesn't have them all with defaults.

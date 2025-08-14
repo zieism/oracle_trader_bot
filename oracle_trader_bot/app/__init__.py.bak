@@ -1,0 +1,121 @@
+"""
+DEPRECATED: App module structure is being refactored.
+
+This shim maintains backward compatibility for app-level imports.
+All modules under 'app' are being reorganized and moved to 'backend.app'.
+
+Examples of deprecated imports that will be redirected:
+- from app.core.config import settings → from backend.app.core.config import settings
+- from app.api.endpoints import trades → from backend.app.api.routers import trading
+- from app.models.trade import Trade → from backend.app.models.trade import Trade
+"""
+
+import warnings
+import sys
+from pathlib import Path
+
+def _show_app_deprecation_warning(old_path: str, new_path: str):
+    """Show a deprecation warning for moved app modules."""
+    warnings.warn(
+        f"Importing from 'app.{old_path}' is deprecated. "
+        f"Please update to 'backend.app.{new_path}' instead.",
+        DeprecationWarning,
+        stacklevel=3
+    )
+
+# Mapping of old app paths to new backend paths - Phase 2 updates
+_APP_IMPORT_MAPPING = {
+    # Core modules (unchanged in Phase 2)
+    'core.config': 'core.config',
+    'core.bot_process_manager': 'core.bot_process_manager',
+    
+    # API modules (unchanged in Phase 2) 
+    'api.dependencies': 'api.dependencies',
+    'api.endpoints': 'api.endpoints',
+    
+    # Services - Phase 2 moves
+    'services.position_monitor': 'services.position_monitor',
+    'exchange_clients.kucoin_futures_client': 'services.kucoin_futures_client',
+    
+    # Strategies - Phase 2 moves (kept same names)
+    'strategies.trend_following_strategy': 'strategies.trend_following_strategy',
+    'strategies.range_trading_strategy': 'strategies.range_trading_strategy',
+    
+    # Indicators - Phase 2 moves
+    'indicators.technical_indicators': 'indicators.technical_indicators',
+    
+    # Analysis - Phase 2 reorganization
+    'analysis.market_regime': 'services.market_regime_service',
+    
+    # Data layer (unchanged in Phase 2)
+    'db': 'db',
+    'models': 'models', 
+    'schemas': 'schemas',
+    'crud': 'crud',
+}
+
+class AppCompatibilityShim:
+    """
+    App-level compatibility shim for redirecting imports.
+    """
+    
+    def __getattr__(self, name: str):
+        # Handle special Python module attributes
+        if name in ['__path__', '__file__', '__package__']:
+            raise AttributeError(f"'{__name__}' has no attribute '{name}'")
+        
+        # Check if this is a direct module import
+        if name in ['core', 'api', 'services', 'exchange_clients', 'strategies', 
+                   'indicators', 'analysis', 'db', 'models', 'schemas', 'crud']:
+            return AppModuleShim(name)
+        
+        # Handle direct imports
+        old_path = name
+        new_path = _APP_IMPORT_MAPPING.get(name, name)
+        
+        _show_app_deprecation_warning(old_path, new_path)
+        
+        try:
+            # Try to import from backend location first (if available)
+            full_backend_path = f'backend.app.{new_path}'
+            module = __import__(full_backend_path, fromlist=[new_path.split('.')[-1]])
+            return module
+        except ImportError:
+            # Fall back to current oracle_trader_bot location
+            try:
+                current_location = f'oracle_trader_bot.app.{new_path}'
+                module = __import__(current_location, fromlist=[name.split('.')[-1]])
+                return module
+            except ImportError:
+                raise ImportError(f"Cannot import '{name}' from app module")
+
+class AppModuleShim:
+    """
+    Shim for app submodules (e.g., app.core, app.api, etc.)
+    """
+    
+    def __init__(self, module_name: str):
+        self.module_name = module_name
+        
+    def __getattr__(self, name: str):
+        full_old_path = f'{self.module_name}.{name}'
+        new_path = _APP_IMPORT_MAPPING.get(full_old_path, full_old_path)
+        
+        _show_app_deprecation_warning(full_old_path, new_path)
+        
+        try:
+            # Try backend location first (if available)
+            full_backend_path = f'backend.app.{new_path}'
+            module = __import__(full_backend_path, fromlist=[new_path.split('.')[-1]])
+            return module
+        except ImportError:
+            # Fall back to oracle_trader_bot location
+            try:
+                current_path = f'oracle_trader_bot.app.{full_old_path}'
+                module = __import__(current_path, fromlist=[name])
+                return module
+            except ImportError:
+                raise ImportError(f"Cannot import '{name}' from app.{self.module_name}")
+
+# Create the main app compatibility interface
+sys.modules[__name__] = AppCompatibilityShim()

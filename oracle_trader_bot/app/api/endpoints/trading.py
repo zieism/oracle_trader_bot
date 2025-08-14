@@ -182,8 +182,15 @@ async def execute_trading_signal(
             raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Order placement failed (client error or no order ID).")
 
     except KucoinAuthError as e:
-        logger.error(f"ExecuteSignal: Auth error for {ccxt_market_id}: {e}", exc_info=True)
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=f"KuCoin Auth Error: {str(e)}")
+        logger.warning(f"ExecuteSignal: Missing credentials for trading operation on {ccxt_market_id}: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail={
+                "ok": False,
+                "reason": "missing_credentials",
+                "message": "Trading operations require API credentials"
+            }
+        )
     except KucoinRequestError as e: 
         logger.error(f"ExecuteSignal: KuCoin request error for {ccxt_market_id}: {e}", exc_info=True)
         original_ccxt_error = e.__cause__ or e.__context__
