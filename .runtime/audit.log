@@ -1,0 +1,4 @@
+{"timestamp":"2025-08-15T00:34:18.182394+03:30","actor":{"ip":"testclient","user_agent":"testclient"},"changes":[{"field":"PROJECT_NAME","old":"Oracle Trader Bot","new":"Audit Test Bot"},{"field":"KUCOIN_API_KEY","old":"<redacted>","new":"<redacted>"}]}
+{"timestamp":"2025-08-15T00:34:18.227819+03:30","actor":{"ip":"testclient","user_agent":"testclient"},"changes":[{"field":"PROJECT_NAME","old":"Audit Test Bot","new":"Second Update Test"}]}
+{"timestamp":"2025-08-15T01:26:04.686363+03:30","actor":{"ip":"testclient","user_agent":"testclient"},"changes":[{"field":"PROJECT_NAME","old":"Second Update Test","new":"Test"}]}
+{"timestamp":"2025-08-15T01:26:04.707901+03:30","actor":{"ip":"testclient","user_agent":"testclient"},"changes":[{"field":"PROJECT_NAME","old":"Test","new":"Test2"}]}

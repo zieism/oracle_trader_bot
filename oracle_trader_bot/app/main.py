@@ -9,6 +9,17 @@ from logging.handlers import RotatingFileHandler
 import sys
 from fastui import prebuilt_html
 import aiohttp
+
+# Import security headers middleware
+from app.middleware.security_headers import SecurityHeadersMiddleware
+from fastapi.responses import HTMLResponse
+from fastapi.middleware.cors import CORSMiddleware
+from typing import Dict, Any
+import os
+from logging.handlers import RotatingFileHandler
+import sys
+from fastui import prebuilt_html
+import aiohttp
 from app.core.config import settings
 from app.db.lazy_session import get_async_engine, get_session_factory, test_db_connection
 from app.db.session import Base
@@ -217,6 +228,9 @@ app.add_middleware(
     allow_headers=['*'], 
     expose_headers=['*']
 )
+
+# Add security headers middleware
+app.add_middleware(SecurityHeadersMiddleware)
 app.include_router(trades_router.router, prefix='/api/v1/db/trades', tags=[
     'Database - Trades'])
 app.include_router(exchange_info_router.router, prefix='/api/v1/exchange',

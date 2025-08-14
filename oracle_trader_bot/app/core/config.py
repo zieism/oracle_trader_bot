@@ -157,6 +157,18 @@ class Settings(BaseSettings):
     MAX_LOG_FILE_SIZE_MB: int = 5 # 5 MB
     LOG_FILE_BACKUP_COUNT: int = 5 # Keep 5 backup log files
 
+    # --- Rate Limiting Settings ---
+    SETTINGS_RATE_LIMIT: str = Field(default="10/min", description="Rate limit for /api/v1/settings* endpoints per IP")
+    HEALTH_RATE_LIMIT: str = Field(default="30/min", description="Rate limit for /api/v1/health/* endpoints per IP")
+    REDIS_URL: Optional[str] = Field(default=None, description="Redis URL for distributed rate limiting (optional)")
+
+    # --- Security Headers Settings ---
+    SECURITY_HEADERS_X_CONTENT_TYPE_OPTIONS: bool = Field(default=True, description="Enable X-Content-Type-Options: nosniff header")
+    SECURITY_HEADERS_X_FRAME_OPTIONS: bool = Field(default=True, description="Enable X-Frame-Options: DENY header")
+    SECURITY_HEADERS_REFERRER_POLICY: bool = Field(default=True, description="Enable Referrer-Policy: no-referrer header")
+    SECURITY_HEADERS_STRICT_TRANSPORT_SECURITY: bool = Field(default=True, description="Enable Strict-Transport-Security header (HTTPS only)")
+    SECURITY_HEADERS_CONTENT_SECURITY_POLICY: bool = Field(default=False, description="Enable Content-Security-Policy: default-src 'self' header")
+
     # These fields will hold the parsed list of tuples
     TREND_LEVERAGE_TIERS: List[Tuple[float, int]] = Field(default_factory=list, validate_default=False)
     RANGE_LEVERAGE_TIERS: List[Tuple[float, int]] = Field(default_factory=list, validate_default=False)

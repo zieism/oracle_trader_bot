@@ -2,44 +2,137 @@
 import os
 import json
 import logging
-from typing import Optional, Dict, Any
+import stat
+from typing import Optional, Dict, Any, Tuple
 from datetime import datetime
 from pathlib import Path
 
 from app.core.config import settings
 from app.schemas.settings import SettingsRead, SettingsUpdate, SettingsInternal
+from app.utils.crypto_helper import settings_encryption
+from app.utils.audit_logger import audit_logger
 
 logger = logging.getLogger(__name__)
 
+# Configure logging to redact secrets
+class SecureLogFormatter(logging.Formatter):
+    """Custom log formatter that redacts sensitive information"""
+    
+    SENSITIVE_FIELDS = [
+        'KUCOIN_API_KEY', 'KUCOIN_API_SECRET', 'KUCOIN_API_PASSPHRASE',
+        'POSTGRES_PASSWORD', 'SETTINGS_ENCRYPTION_KEY'
+    ]
+    
+    def format(self, record):
+        # Get the original message
+        original_msg = super().format(record)
+        
+        # Redact sensitive fields
+        for field in self.SENSITIVE_FIELDS:
+            # Match various patterns: field=value, "field": "value", etc.
+            import re
+            patterns = [
+                rf'{field}["\']?\s*[:=]\s*["\']?([^"\s,}}]+)',
+                rf'Updated settings\.{field} = ([^\s,}}]+)',
+                rf'{field}["\']?\s*:\s*["\']([^"]+)["\']'
+            ]
+            
+            for pattern in patterns:
+                original_msg = re.sub(
+                    pattern, 
+                    rf'{field}=<redacted>', 
+                    original_msg, 
+                    flags=re.IGNORECASE
+                )
+        
+        return original_msg
+
+# Apply secure logging if not already configured
+if not any(isinstance(handler.formatter, SecureLogFormatter) for handler in logger.handlers):
+    for handler in logger.handlers:
+        if handler.formatter:
+            handler.setFormatter(SecureLogFormatter(handler.formatter._fmt if hasattr(handler.formatter, '_fmt') else '%(message)s'))
+
 class SettingsManager:
     """
-    Manages settings persistence with dual mode support:
-    - lite mode: File-based storage in .runtime/settings.json
+    Manages settings persistence with dual mode support and security hardening:
+    - lite mode: File-based storage in .runtime/settings.json (optionally encrypted)
     - full mode: Database-backed storage with file fallback
+    - Secret redaction in logs
+    - Preserve existing secrets on empty PUT
+    - Secure file permissions
     """
     
     def __init__(self):
         self.runtime_dir = Path(".runtime")
         self.settings_file = self.runtime_dir / "settings.json"
         self._ensure_runtime_dir()
-    
-    def _ensure_runtime_dir(self):
-        """Ensure runtime directory exists"""
-        self.runtime_dir.mkdir(exist_ok=True)
-    
-    def _mask_secrets(self, data: Dict[str, Any]) -> Dict[str, Any]:
-        """Mask sensitive fields for reading"""
-        masked_data = data.copy()
-        secret_fields = [
+        self._secret_fields = {
             'KUCOIN_API_KEY', 'KUCOIN_API_SECRET', 'KUCOIN_API_PASSPHRASE',
             'POSTGRES_PASSWORD'
-        ]
+        }
+    
+    def _ensure_runtime_dir(self):
+        """Ensure runtime directory exists with secure permissions"""
+        self.runtime_dir.mkdir(exist_ok=True)
         
-        for field in secret_fields:
-            if field in masked_data and masked_data[field]:
+        # Set secure permissions (owner only) where OS supports it
+        try:
+            if os.name == 'posix':  # Unix-like systems
+                os.chmod(self.runtime_dir, stat.S_IRWXU)  # 0o700
+                logger.debug("Set runtime directory permissions to 0o700")
+        except Exception as e:
+            logger.warning(f"Could not set secure directory permissions: {e}")
+    
+    def _mask_secrets(self, data: Dict[str, Any]) -> Dict[str, Any]:
+        """Mask sensitive fields for reading - ALWAYS return *** for secrets"""
+        masked_data = data.copy()
+        
+        for field in self._secret_fields:
+            if field in masked_data:
+                # ALWAYS mask secrets regardless of their actual value
                 masked_data[field] = "***"
         
         return masked_data
+    
+    def _redact_for_logging(self, data: Dict[str, Any]) -> Dict[str, Any]:
+        """Create a copy of data with secrets redacted for logging"""
+        redacted = data.copy()
+        for field in self._secret_fields:
+            if field in redacted:
+                redacted[field] = "<redacted>"
+        return redacted
+    
+    def _validate_secret_format(self, field: str, value: str) -> Tuple[bool, Optional[str]]:
+        """
+        Validate secret field format without leaking actual values
+        
+        Returns:
+            (is_valid, error_message)
+        """
+        if not value or not value.strip():
+            return True, None  # Empty is OK (will be ignored)
+        
+        value = value.strip()
+        
+        # Basic format validation without revealing content
+        if field in ['KUCOIN_API_KEY', 'KUCOIN_API_SECRET', 'KUCOIN_API_PASSPHRASE']:
+            if len(value) < 8:
+                return False, f"{field} must be at least 8 characters"
+            if len(value) > 200:
+                return False, f"{field} exceeds maximum length"
+            # Check for basic alphanumeric pattern (don't reveal actual chars)
+            import re
+            if not re.match(r'^[a-zA-Z0-9\-_+=/.]+$', value):
+                return False, f"{field} contains invalid characters"
+        
+        elif field == 'POSTGRES_PASSWORD':
+            if len(value) < 6:
+                return False, "Password must be at least 6 characters"
+            if len(value) > 128:
+                return False, "Password exceeds maximum length"
+        
+        return True, None
     
     def _get_current_settings_dict(self) -> Dict[str, Any]:
         """Get current settings as dictionary"""
@@ -135,30 +228,88 @@ class SettingsManager:
         }
     
     def _load_file_settings(self) -> Optional[Dict[str, Any]]:
-        """Load settings from file"""
+        """Load settings from file (with optional decryption)"""
         try:
-            if self.settings_file.exists():
-                with open(self.settings_file, 'r') as f:
-                    data = json.load(f)
-                    logger.info(f"Settings loaded from {self.settings_file}")
-                    return data
+            if not self.settings_file.exists():
+                return None
+            
+            with open(self.settings_file, 'r') as f:
+                content = f.read().strip()
+            
+            if not content:
+                return None
+            
+            # Try to detect if content is encrypted (base64) or plain JSON
+            try:
+                # First try as plain JSON
+                data = json.loads(content)
+                logger.info(f"Settings loaded from {self.settings_file} (plaintext)")
+                return data
+            except json.JSONDecodeError:
+                # If JSON parsing fails, try as encrypted data
+                if settings_encryption.is_enabled():
+                    try:
+                        data = settings_encryption.decrypt_from_base64(content)
+                        logger.info(f"Settings loaded from {self.settings_file} (encrypted)")
+                        return data
+                    except Exception as decrypt_err:
+                        logger.error(f"Failed to decrypt settings file: {decrypt_err}")
+                        return None
+                else:
+                    logger.error("Settings file appears encrypted but no encryption key available")
+                    return None
+                    
         except Exception as e:
             logger.error(f"Error loading settings from file: {e}")
         return None
     
     def _save_file_settings(self, data: Dict[str, Any]) -> bool:
-        """Save settings to file"""
+        """Save settings to file (with optional encryption and secure permissions)"""
         try:
             # Add timestamp
-            data['updated_at'] = datetime.now().isoformat()
+            data_to_save = data.copy()
+            data_to_save['updated_at'] = datetime.now().isoformat()
             
-            with open(self.settings_file, 'w') as f:
-                json.dump(data, f, indent=2, default=str)
+            # Log redacted version
+            logger.info(f"Saving settings with {len(data_to_save)} fields: {list(self._redact_for_logging(data_to_save).keys())}")
+            
+            # Prepare content for saving
+            if settings_encryption.is_enabled():
+                # Save encrypted
+                content = settings_encryption.encrypt_to_base64(data_to_save)
+                logger.debug("Settings will be saved encrypted")
+            else:
+                # Save as plain JSON
+                content = json.dumps(data_to_save, indent=2, default=str)
+                logger.debug("Settings will be saved as plaintext")
+            
+            # Write to file with atomic operation
+            temp_file = self.settings_file.with_suffix('.tmp')
+            with open(temp_file, 'w') as f:
+                f.write(content)
+            
+            # Set secure permissions before moving to final location
+            try:
+                if os.name == 'posix':  # Unix-like systems
+                    os.chmod(temp_file, stat.S_IRUSR | stat.S_IWUSR)  # 0o600
+            except Exception as e:
+                logger.warning(f"Could not set secure file permissions: {e}")
+            
+            # Atomic move to final location
+            temp_file.replace(self.settings_file)
             
             logger.info(f"Settings saved to {self.settings_file}")
             return True
+            
         except Exception as e:
             logger.error(f"Error saving settings to file: {e}")
+            # Clean up temp file if it exists
+            temp_file = self.settings_file.with_suffix('.tmp')
+            if temp_file.exists():
+                try:
+                    temp_file.unlink()
+                except:
+                    pass
             return False
     
     async def get_settings(self) -> SettingsRead:
@@ -177,7 +328,7 @@ class SettingsManager:
         return SettingsRead(**self._mask_secrets(current))
     
     def _update_settings_object(self, updates: Dict[str, Any]):
-        """Update the global settings object in memory"""
+        """Update the global settings object in memory with redacted logging"""
         for key, value in updates.items():
             if hasattr(settings, key) and value is not None:
                 # Handle special cases for validation
@@ -186,51 +337,113 @@ class SettingsManager:
                     continue
                 
                 setattr(settings, key, value)
-                logger.info(f"Updated settings.{key} = {value if key not in ['KUCOIN_API_SECRET', 'POSTGRES_PASSWORD'] else '***'}")
+                
+                # Log with redaction for secrets
+                if key in self._secret_fields:
+                    logger.info(f"Updated settings.{key} = <redacted>")
+                else:
+                    logger.info(f"Updated settings.{key} = {value}")
     
-    async def update_settings(self, updates: SettingsUpdate) -> SettingsRead:
-        """Update settings and persist them"""
-        # Convert to dict, excluding None values and empty secrets
+    def _preserve_existing_secrets(self, updates: Dict[str, Any], existing: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Preserve existing secret values when PUT contains empty/*** values
+        
+        Args:
+            updates: New values from PUT request
+            existing: Current stored values
+            
+        Returns:
+            Updated dict with existing secrets preserved where appropriate
+        """
+        preserved_updates = updates.copy()
+        
+        for field in self._secret_fields:
+            if field in updates:
+                new_value = updates[field]
+                
+                # Preserve existing if new value is empty, whitespace, or ***
+                if not new_value or not new_value.strip() or new_value.strip() == "***":
+                    if field in existing and existing[field]:
+                        preserved_updates[field] = existing[field]
+                        logger.debug(f"Preserved existing value for {field}")
+                    else:
+                        # Remove from updates if no existing value to preserve
+                        preserved_updates.pop(field, None)
+                        logger.debug(f"Removed empty {field} from updates")
+                else:
+                    # Validate format of new secret
+                    is_valid, error = self._validate_secret_format(field, new_value)
+                    if not is_valid:
+                        logger.warning(f"Secret validation failed for {field}: {error}")
+                        raise ValueError(f"Invalid {field}: {error}")
+        
+        return preserved_updates
+    
+    async def update_settings(self, updates: SettingsUpdate, request=None) -> SettingsRead:
+        """Update settings and persist them with secret preservation and audit logging"""
+        # Convert to dict, excluding None values
         updates_dict = {}
         for key, value in updates.dict(exclude_none=True).items():
-            # Skip empty secrets (don't update if empty string)
-            if key in ['KUCOIN_API_KEY', 'KUCOIN_API_SECRET', 'KUCOIN_API_PASSPHRASE', 'POSTGRES_PASSWORD']:
-                if value and value.strip():  # Only update if not empty
-                    updates_dict[key] = value.strip()
-            else:
+            if value is not None:
                 updates_dict[key] = value
-        
+
         if not updates_dict:
             logger.info("No valid updates provided")
             return await self.get_settings()
-        
-        # Load current settings for merging
+
+        logger.info(f"Processing settings update with fields: {list(updates_dict.keys())}")
+
+        # Load current settings for merging and secret preservation
         current = self._get_current_settings_dict()
         
-        # In lite mode, load from file first
+        # In lite mode, load from file first to get stored secrets
+        stored_settings = {}
         if settings.APP_STARTUP_MODE == "lite":
             file_settings = self._load_file_settings()
             if file_settings:
                 current.update(file_settings)
-        
-        # Apply updates
-        current.update(updates_dict)
-        
+                stored_settings = file_settings
+
+        # Capture original values for audit logging
+        original_values = stored_settings.copy() if stored_settings else current.copy()
+
+        # Preserve existing secrets when new values are empty/masked
+        preserved_updates = self._preserve_existing_secrets(updates_dict, stored_settings if stored_settings else current)
+
+        if not preserved_updates:
+            logger.info("No valid updates after secret preservation")
+            return await self.get_settings()
+
+        # Apply updates to current settings
+        current.update(preserved_updates)
+
         # Save to file (always in lite mode, or as backup in full mode)
         if settings.APP_STARTUP_MODE == "lite":
             success = self._save_file_settings(current)
             if not success:
                 logger.error("Failed to save settings to file")
                 raise Exception("Failed to persist settings")
-        
+
+        # Log audit trail for successful changes
+        try:
+            audit_logger.log_settings_change(
+                old_values=original_values,
+                new_values=current,
+                request=request
+            )
+        except Exception as e:
+            logger.warning(f"Audit logging failed: {e}")
+            # Don't fail the main operation due to audit issues
+
         # Update in-memory settings
-        self._update_settings_object(updates_dict)
-        
+        self._update_settings_object(preserved_updates)
+
         # Re-initialize dependent services
-        await self._reinit_services(updates_dict)
-        
+        await self._reinit_services(preserved_updates)
+
+        logger.info(f"Settings update completed successfully for {len(preserved_updates)} fields")
         return await self.get_settings()
-    
+
     async def _reinit_services(self, changes: Dict[str, Any]):
         """Re-initialize dependent services when settings change"""
         services_reinitialized = []

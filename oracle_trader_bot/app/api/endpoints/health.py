@@ -2,7 +2,7 @@
 Health check endpoints for monitoring app, database, and exchange status.
 """
 
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, HTTPException, status, Request, Response, Depends
 from pydantic import BaseModel
 from typing import Optional, Dict, Any
 import logging
@@ -10,9 +10,10 @@ import logging
 from app.core.config import settings
 from app.db.lazy_session import test_db_connection, get_db_status
 from app.exchange_clients.kucoin_futures_client import KucoinFuturesClient
+from app.utils.rate_limiter import rate_limit
 
 logger = logging.getLogger(__name__)
-router = APIRouter(prefix="/health", tags=["health"])
+router = APIRouter(tags=["health"])
 
 
 class HealthResponse(BaseModel):
@@ -42,7 +43,11 @@ class ExchangeHealthResponse(HealthResponse):
 
 
 @router.get("/app", response_model=AppHealthResponse)
-async def health_app():
+async def health_app(
+    request: Request,
+    response: Response,
+    _: None = Depends(rate_limit(settings.HEALTH_RATE_LIMIT, "health"))
+):
     """
     Application health check.
     Always returns 200 OK with app status.
@@ -63,7 +68,11 @@ async def health_app():
 
 
 @router.get("/db", response_model=DatabaseHealthResponse)
-async def health_db():
+async def health_db(
+    request: Request,
+    response: Response,
+    _: None = Depends(rate_limit(settings.HEALTH_RATE_LIMIT, "health"))
+):
     """
     Database health check.
     Tests actual database connectivity with a lightweight query.
@@ -93,7 +102,11 @@ async def health_db():
 
 
 @router.get("/exchange", response_model=ExchangeHealthResponse)
-async def health_exchange():
+async def health_exchange(
+    request: Request,
+    response: Response,
+    _: None = Depends(rate_limit(settings.HEALTH_RATE_LIMIT, "health"))
+):
     """
     Exchange health check.
     Always returns 200 with status information: ok, sandbox, mode, reason.
@@ -152,7 +165,11 @@ async def health_exchange():
 # Legacy health endpoint for backward compatibility
 @router.get("", response_model=HealthResponse)
 @router.get("/", response_model=HealthResponse)  
-async def health_legacy():
+async def health_legacy(
+    request: Request,
+    response: Response,
+    _: None = Depends(rate_limit(settings.HEALTH_RATE_LIMIT, "health"))
+):
     """
     Legacy health endpoint.
     Returns basic OK status for backward compatibility.
