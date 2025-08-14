@@ -1,8 +1,27 @@
 // src/services/apiService.ts
 import axios from 'axios';
 
-const API_BASE_URL = 'http://150.241.85.30:8000/api/v1'; 
-const WS_BASE_URL = 'ws://150.241.85.30:8000/api/v1'; 
+// Use environment variables with fallback to production server
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://150.241.85.30:8000/api/v1';
+const WS_BASE_URL = import.meta.env.VITE_WS_BASE_URL || 'ws://150.241.85.30:8000/api/v1';
+
+// Create axios instance with common configuration
+const apiClient = axios.create({
+  baseURL: API_BASE_URL,
+  timeout: 10000,
+  headers: {
+    'Content-Type': 'application/json',
+  },
+});
+
+// Add response interceptor for error handling
+apiClient.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    console.error('API Error:', error.response?.data || error.message);
+    return Promise.reject(error);
+  }
+); 
 
 
 export interface AccountBalanceDetail {
@@ -24,7 +43,7 @@ export interface AccountOverviewApiResponse {
 export const getAccountOverview = async (): Promise<AccountBalanceDetail | null> => {
   try {
     console.log(`apiService: Fetching account overview from ${API_BASE_URL}/exchange/kucoin/account-overview`);
-    const response = await axios.get<AccountOverviewApiResponse>(`${API_BASE_URL}/exchange/kucoin/account-overview`);
+    const response = await apiClient.get<AccountOverviewApiResponse>(`/exchange/kucoin/account-overview`);
     console.log("apiService: Raw response from /account-overview:", response);
     
     if (response.data && response.data.USDT) {
@@ -66,13 +85,23 @@ export interface BotSettingsData {
     fixed_trade_amount_usd: number;
     percentage_trade_amount: number;
     daily_loss_limit_percentage?: number | null;
+    // Extended settings for comprehensive bot configuration
+    kucoin_api_key?: string;
+    kucoin_api_secret?: string;
+    kucoin_api_passphrase?: string;
+    kucoin_sandbox_mode?: boolean;
+    leverage?: number;
+    risk_per_trade?: number;
+    atr_based_tp_enabled?: boolean;
+    atr_based_sl_enabled?: boolean;
+    timeframes?: string[];
     updated_at?: string; 
 }
 
 export const getBotSettings = async (): Promise<BotSettingsData | null> => {
     try {
-        console.log(`apiService: Fetching bot settings from ${API_BASE_URL}/bot-settings/`);
-        const response = await axios.get<BotSettingsData>(`${API_BASE_URL}/bot-settings/`);
+        console.log(`apiService: Fetching bot settings from /bot-settings/`);
+        const response = await apiClient.get<BotSettingsData>(`/bot-settings/`);
         console.log("apiService: Fetched Bot Settings:", response.data);
         return response.data;
     } catch (error) {
@@ -83,8 +112,8 @@ export const getBotSettings = async (): Promise<BotSettingsData | null> => {
 
 export const updateBotSettings = async (settingsData: Partial<BotSettingsData>): Promise<BotSettingsData | null> => {
     try {
-        console.log(`apiService: Updating bot settings at ${API_BASE_URL}/bot-settings/ with payload:`, settingsData);
-        const response = await axios.put<BotSettingsData>(`${API_BASE_URL}/bot-settings/`, settingsData);
+        console.log(`apiService: Updating bot settings at /bot-settings/ with payload:`, settingsData);
+        const response = await apiClient.put<BotSettingsData>(`/bot-settings/`, settingsData);
         console.log("apiService: Updated Bot Settings:", response.data);
         return response.data;
     } catch (error) {
@@ -112,8 +141,8 @@ export interface TradeData {
 
 export const getTradesHistory = async (skip: number = 0, limit: number = 5): Promise<TradeData[]> => {
     try {
-        console.log(`apiService: Fetching trades history from ${API_BASE_URL}/db/trades/?skip=${skip}&limit=${limit}`);
-        const response = await axios.get<TradeData[]>(`${API_BASE_URL}/db/trades/?skip=${skip}&limit=${limit}`);
+        console.log(`apiService: Fetching trades history from /db/trades/?skip=${skip}&limit=${limit}`);
+        const response = await apiClient.get<TradeData[]>(`/db/trades/?skip=${skip}&limit=${limit}`);
         console.log(`apiService: Fetched Trades History (skip: ${skip}, limit: ${limit}):`, response.data);
         return response.data || []; 
     } catch (error) {
@@ -124,8 +153,8 @@ export const getTradesHistory = async (skip: number = 0, limit: number = 5): Pro
 
 export const getTotalTradesCount = async (): Promise<number> => {
   try {
-    console.log(`apiService: Fetching total trades count from ${API_BASE_URL}/db/trades/total-count`);
-    const response = await axios.get<number>(`${API_BASE_URL}/db/trades/total-count`);
+    console.log(`apiService: Fetching total trades count from /db/trades/total-count`);
+    const response = await apiClient.get<number>(`/db/trades/total-count`);
     console.log("apiService: Fetched Total Trades Count:", response.data);
     return response.data || 0;
   } catch (error) {
@@ -162,11 +191,11 @@ export interface OpenPositionData {
 
 export const getOpenPositions = async (symbol?: string): Promise<OpenPositionData[]> => {
   try {
-    let url = `${API_BASE_URL}/orders/positions`;
+    let url = `/orders/positions`;
     if (symbol) {
       url += `?symbol=${encodeURIComponent(symbol)}`;
     }
-    const response = await axios.get<OpenPositionData[]>(url);
+    const response = await apiClient.get<OpenPositionData[]>(url);
     console.log(`apiService: Fetched Open Positions (symbol: ${symbol || 'All'}):`, response.data);
     return response.data || [];
   } catch (error) {
@@ -189,7 +218,7 @@ export interface ClosePositionResponse {
 export const closePosition = async (payload: ClosePositionPayload): Promise<ClosePositionResponse> => {
   try {
     console.log(`apiService: Attempting to close position for symbol: ${payload.symbol}`);
-    const response = await axios.post<ClosePositionResponse>(`${API_BASE_URL}/orders/positions/close`, payload);
+    const response = await apiClient.post<ClosePositionResponse>(`/orders/positions/close`, payload);
     console.log(`apiService: Close position response for ${payload.symbol}:`, response.data);
     return response.data;
   } catch (error) {
@@ -204,12 +233,51 @@ export interface ExchangeContract {
 
 export const getAvailableSymbols = async (): Promise<string[]> => {
     try {
-        const response = await axios.get<ExchangeContract[]>(`${API_BASE_URL}/exchange/kucoin/contracts`);
-        return response.data.map(contract => contract.symbol);
+        const response = await apiClient.get<ExchangeContract[]>(`/exchange/kucoin/contracts`);
+        return response.data.map((contract: ExchangeContract) => contract.symbol);
     } catch (error) {
         console.error('apiService: Error fetching available symbols:', error);
         throw error;
     }
+};
+
+// ===============================================
+// EXCHANGE HEALTH CHECK & ADDITIONAL ENDPOINTS
+// ===============================================
+
+export interface ExchangeHealthResponse {
+  status: string;
+  message: string;
+  server_time_ms?: number;
+  local_time_ms?: number;
+  time_difference_ms?: number;
+}
+
+export const getExchangeHealth = async (): Promise<ExchangeHealthResponse> => {
+  try {
+    const response = await apiClient.get<ExchangeHealthResponse>(`/exchange/health`);
+    console.log("apiService: Fetched Exchange Health:", response.data);
+    return response.data;
+  } catch (error) {
+    console.error('apiService: Error fetching exchange health:', error);
+    throw error;
+  }
+};
+
+export interface ExchangeSymbolsResponse {
+  symbols: string[];
+  count: number;
+}
+
+export const getExchangeSymbols = async (): Promise<ExchangeSymbolsResponse> => {
+  try {
+    const response = await apiClient.get<ExchangeSymbolsResponse>(`/exchange/symbols`);
+    console.log("apiService: Fetched Exchange Symbols:", response.data);
+    return response.data;
+  } catch (error) {
+    console.error('apiService: Error fetching exchange symbols:', error);
+    throw error;
+  }
 };
 
 // ===============================================
@@ -223,7 +291,7 @@ export interface BotStatusResponse {
 
 export const getBotStatus = async (): Promise<BotStatusResponse> => {
   try {
-    const response = await axios.get<BotStatusResponse>(`${API_BASE_URL}/bot-management/status`);
+    const response = await apiClient.get<BotStatusResponse>(`/bot-management/status`);
     console.log("apiService: Fetched Bot Status:", response.data);
     return response.data;
   } catch (error) {
@@ -234,7 +302,7 @@ export const getBotStatus = async (): Promise<BotStatusResponse> => {
 
 export const startBot = async (): Promise<{ status: string; message: string }> => {
   try {
-    const response = await axios.post<{ status: string; message: string }>(`${API_BASE_URL}/bot-management/start`);
+    const response = await apiClient.post<{ status: string; message: string }>(`/bot-management/start`);
     console.log("apiService: Start bot response:", response.data);
     return response.data;
   } catch (error) {
@@ -245,7 +313,7 @@ export const startBot = async (): Promise<{ status: string; message: string }> =
 
 export const stopBot = async (): Promise<{ status: string; message: string }> => {
   try {
-    const response = await axios.post<{ status: string; message: string }>(`${API_BASE_URL}/bot-management/stop`);
+    const response = await apiClient.post<{ status: string; message: string }>(`/bot-management/stop`);
     console.log("apiService: Stop bot response:", response.data);
     return response.data;
   } catch (error) {
@@ -284,9 +352,9 @@ export const getServerLogs = async (
       params.append('search', search);
     }
 
-    const url = `${API_BASE_URL}/logs/server-logs?${params.toString()}`;
+    const url = `/logs/server-logs?${params.toString()}`;
     console.log(`apiService: Fetching server logs from ${url}`);
-    const response = await axios.get<LogEntry[]>(url);
+    const response = await apiClient.get<LogEntry[]>(url);
     console.log("apiService: Fetched Server Logs:", response.data);
     return response.data;
   } catch (error) {

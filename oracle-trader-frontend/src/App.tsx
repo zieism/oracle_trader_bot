@@ -17,12 +17,12 @@ import LiveTvIcon from '@mui/icons-material/LiveTv'; // ADDED: Import LiveTvIcon
 import Typography from '@mui/material/Typography';
 import { Divider } from '@mui/material';
 
-// Import pages
-import DashboardPage from './pages/DashboardPage';
-import BotSettingsPage from './pages/BotSettingsPage';
-import TradesLogPage from './pages/TradesLogPage';
-import ServerLogPage from './pages/ServerLogPage'; 
-import AnalysisLogPage from './pages/AnalysisLogPage'; // ADDED: Import AnalysisLogPage
+// Import pages using new feature-based structure with path aliases
+import DashboardPage from '@features/dashboard/DashboardPage';
+import BotSettingsPage from '@features/settings/BotSettingsPage';
+import TradesLogPage from '@features/trades/TradesLogPage';
+import ServerLogPage from '@features/logs/ServerLogPage'; 
+import AnalysisLogPage from '@features/analysis/AnalysisLogPage'; // ADDED: Import AnalysisLogPage
 
 const darkTheme = createTheme({
   palette: {
