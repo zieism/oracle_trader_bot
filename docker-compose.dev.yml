@@ -1,0 +1,81 @@
+# docker-compose.dev.yml - Development Docker Compose Configuration
+version: '3.8'
+
+services:
+  # PostgreSQL Database (Development)
+  postgres:
+    image: postgres:15-alpine
+    container_name: oracle_trader_postgres_dev
+    environment:
+      POSTGRES_DB: oracle_trader_bot_dev
+      POSTGRES_USER: oracle_dev
+      POSTGRES_PASSWORD: dev_password
+    volumes:
+      - postgres_dev_data:/var/lib/postgresql/data
+    ports:
+      - "5433:5432"
+    networks:
+      - oracle_dev_network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U oracle_dev -d oracle_trader_bot_dev"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Redis Cache (Development)
+  redis:
+    image: redis:7-alpine
+    container_name: oracle_trader_redis_dev
+    ports:
+      - "6380:6379"
+    networks:
+      - oracle_dev_network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  # Backend (Development with hot reload)
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+      target: base
+    container_name: oracle_trader_backend_dev
+    environment:
+      APP_STARTUP_MODE: lite
+      SKIP_DB_INIT: true
+      DEBUG: true
+      POSTGRES_SERVER: postgres
+      POSTGRES_PORT: 5432
+      POSTGRES_USER: oracle_dev
+      POSTGRES_PASSWORD: dev_password
+      POSTGRES_DB: oracle_trader_bot_dev
+      REDIS_URL: redis://redis:6379/0
+      ADMIN_API_TOKEN: dev_admin_token
+      SETTINGS_RATE_LIMIT: 100/min
+      HEALTH_RATE_LIMIT: 200/min
+    volumes:
+      - ./oracle_trader_bot:/app
+      - backend_dev_logs:/app/logs
+    ports:
+      - "8001:8000"
+    networks:
+      - oracle_dev_network
+    depends_on:
+      - postgres
+      - redis
+    command: ["python", "-m", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
+    restart: unless-stopped
+
+volumes:
+  postgres_dev_data:
+    name: oracle_trader_postgres_dev_data
+  backend_dev_logs:
+    name: oracle_trader_backend_dev_logs
+
+networks:
+  oracle_dev_network:
+    name: oracle_trader_dev_network
+    driver: bridge

@@ -1,0 +1,179 @@
+# docker-compose.yml - Production Docker Compose Configuration
+version: '3.8'
+
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:15-alpine
+    container_name: oracle_trader_postgres
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-oracle_trader_bot}
+      POSTGRES_USER: ${POSTGRES_USER:-oracle_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-oracle_password}
+      POSTGRES_INITDB_ARGS: "--encoding=UTF-8 --lc-collate=C --lc-ctype=C"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./init-db:/docker-entrypoint-initdb.d
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    networks:
+      - oracle_network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-oracle_user} -d ${POSTGRES_DB:-oracle_trader_bot}"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+    restart: unless-stopped
+
+  # Redis Cache (Optional)
+  redis:
+    image: redis:7-alpine
+    container_name: oracle_trader_redis
+    command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD:-redis_password}
+    volumes:
+      - redis_data:/data
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    networks:
+      - oracle_network
+    healthcheck:
+      test: ["CMD", "redis-cli", "--no-auth-warning", "-a", "${REDIS_PASSWORD:-redis_password}", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+    restart: unless-stopped
+    profiles:
+      - with-redis
+
+  # FastAPI Backend
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+    container_name: oracle_trader_backend
+    environment:
+      # App Configuration
+      APP_STARTUP_MODE: ${APP_STARTUP_MODE:-full}
+      SKIP_DB_INIT: ${SKIP_DB_INIT:-false}
+      PROJECT_NAME: ${PROJECT_NAME:-Oracle Trader Bot}
+      VERSION: ${VERSION:-2.0.0}
+      DEBUG: ${DEBUG:-false}
+      
+      # Database Configuration
+      POSTGRES_SERVER: postgres
+      POSTGRES_PORT: 5432
+      POSTGRES_USER: ${POSTGRES_USER:-oracle_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-oracle_password}
+      POSTGRES_DB: ${POSTGRES_DB:-oracle_trader_bot}
+      
+      # Redis Configuration (Optional)
+      REDIS_URL: ${REDIS_URL:-redis://:${REDIS_PASSWORD:-redis_password}@redis:6379/0}
+      
+      # Security Configuration
+      ADMIN_API_TOKEN: ${ADMIN_API_TOKEN:-}
+      SETTINGS_ENCRYPTION_KEY: ${SETTINGS_ENCRYPTION_KEY:-}
+      
+      # Rate Limiting
+      SETTINGS_RATE_LIMIT: ${SETTINGS_RATE_LIMIT:-10/min}
+      HEALTH_RATE_LIMIT: ${HEALTH_RATE_LIMIT:-30/min}
+      
+      # Security Headers
+      SECURITY_HEADERS_X_CONTENT_TYPE_OPTIONS: ${SECURITY_HEADERS_X_CONTENT_TYPE_OPTIONS:-true}
+      SECURITY_HEADERS_X_FRAME_OPTIONS: ${SECURITY_HEADERS_X_FRAME_OPTIONS:-true}
+      SECURITY_HEADERS_REFERRER_POLICY: ${SECURITY_HEADERS_REFERRER_POLICY:-true}
+      SECURITY_HEADERS_STRICT_TRANSPORT_SECURITY: ${SECURITY_HEADERS_STRICT_TRANSPORT_SECURITY:-true}
+      SECURITY_HEADERS_CONTENT_SECURITY_POLICY: ${SECURITY_HEADERS_CONTENT_SECURITY_POLICY:-false}
+      
+      # Exchange Configuration
+      KUCOIN_API_KEY: ${KUCOIN_API_KEY:-}
+      KUCOIN_API_SECRET: ${KUCOIN_API_SECRET:-}
+      KUCOIN_API_PASSPHRASE: ${KUCOIN_API_PASSPHRASE:-}
+      KUCOIN_SANDBOX: ${KUCOIN_SANDBOX:-true}
+      
+      # Server Configuration
+      SERVER_PUBLIC_IP: ${SERVER_PUBLIC_IP:-localhost}
+      API_INTERNAL_BASE_URL: http://backend:8000
+      
+    volumes:
+      - backend_logs:/app/logs
+      - backend_settings:/app/settings
+    ports:
+      - "8000:8000"
+    networks:
+      - oracle_network
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/v1/health/app"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+    restart: unless-stopped
+
+  # React Frontend
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile.frontend
+      args:
+        VITE_API_BASE_URL: ${VITE_API_BASE_URL:-http://localhost/api/v1}
+        VITE_WS_BASE_URL: ${VITE_WS_BASE_URL:-ws://localhost/api/v1}
+    container_name: oracle_trader_frontend
+    ports:
+      - "3000:80"
+    networks:
+      - oracle_network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    restart: unless-stopped
+
+  # Nginx Reverse Proxy
+  nginx:
+    image: nginx:alpine
+    container_name: oracle_trader_nginx
+    ports:
+      - "${NGINX_PORT:-80}:80"
+      - "${NGINX_SSL_PORT:-443}:443"
+    volumes:
+      - ./nginx/reverse-proxy.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - nginx_logs:/var/log/nginx
+      # SSL certificates (if needed)
+      # - ./ssl:/etc/nginx/ssl:ro
+    networks:
+      - oracle_network
+    depends_on:
+      - backend
+      - frontend
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    restart: unless-stopped
+
+# Named volumes for persistent data
+volumes:
+  postgres_data:
+    name: oracle_trader_postgres_data
+  redis_data:
+    name: oracle_trader_redis_data
+  backend_logs:
+    name: oracle_trader_backend_logs
+  backend_settings:
+    name: oracle_trader_backend_settings
+  nginx_logs:
+    name: oracle_trader_nginx_logs
+
+# Custom network
+networks:
+  oracle_network:
+    name: oracle_trader_network
+    driver: bridge
