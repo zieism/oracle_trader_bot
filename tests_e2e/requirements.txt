@@ -1,0 +1,16 @@
+# E2E Test Dependencies for Oracle Trader Bot
+# Install with: pip install -r tests_e2e/requirements.txt
+
+# Core testing framework
+pytest>=7.0.0
+pytest-asyncio>=0.21.0
+
+# HTTP client for API tests
+aiohttp>=3.8.0
+
+# UI testing with Playwright (optional)
+playwright>=1.30.0
+pytest-playwright>=0.3.0
+
+# Additional utilities
+requests>=2.28.0  # Fallback HTTP client
