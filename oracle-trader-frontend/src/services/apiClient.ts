@@ -4,7 +4,7 @@ import axios, { AxiosInstance } from 'axios';
 // ==================== CONFIGURATION ====================
 // All URLs are centralized here and come from environment variables
 
-const CONFIG = {
+export const CONFIG = {
   API_BASE_URL: import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api/v1',
   WS_BASE_URL: import.meta.env.VITE_WS_BASE_URL || 'ws://localhost:8000/api/v1',
   REQUEST_TIMEOUT: 10000,
@@ -367,6 +367,139 @@ export const getServerLogs = async (
     return response.data;
   } catch (error) {
     console.error('apiService: Error fetching server logs:', error);
+    throw error;
+  }
+};
+
+// ===============================================
+// SETTINGS API FUNCTIONS
+// ===============================================
+
+export interface SystemSettings {
+  // Project & App Configuration
+  PROJECT_NAME: string;
+  VERSION: string;
+  DEBUG: boolean;
+  APP_STARTUP_MODE: string;
+  SKIP_DB_INIT: boolean;
+  
+  // Exchange Configuration
+  KUCOIN_API_KEY?: string | null;
+  KUCOIN_API_SECRET?: string | null;
+  KUCOIN_API_PASSPHRASE?: string | null;
+  KUCOIN_API_BASE_URL: string;
+  KUCOIN_SANDBOX: boolean;
+  
+  // Server Configuration
+  SERVER_PUBLIC_IP: string;
+  API_INTERNAL_BASE_URL: string;
+  CORS_ALLOWED_ORIGINS: string[];
+  
+  // Database Configuration
+  POSTGRES_SERVER: string;
+  POSTGRES_PORT: string;
+  POSTGRES_USER: string;
+  POSTGRES_PASSWORD: string; // Will be "***" when read
+  POSTGRES_DB: string;
+  
+  // Bot Core Loop Settings
+  SYMBOLS_TO_TRADE_BOT: string[];
+  PRIMARY_TIMEFRAME_BOT: string;
+  CANDLE_LIMIT_BOT: number;
+  LOOP_SLEEP_DURATION_SECONDS_BOT: number;
+  DELAY_BETWEEN_SYMBOL_PROCESSING_SECONDS_BOT: number;
+  
+  // General Trading Parameters
+  FIXED_USD_AMOUNT_PER_TRADE: number;
+  BOT_DEFAULT_LEVERAGE: number;
+  
+  // Default Bot Settings
+  MAX_CONCURRENT_TRADES_BOT_CONFIG: number;
+  TRADE_AMOUNT_MODE_BOT_CONFIG: string;
+  PERCENTAGE_TRADE_AMOUNT_BOT_CONFIG: number;
+  DAILY_LOSS_LIMIT_PERCENTAGE_BOT_CONFIG?: number | null;
+  
+  // Market Regime Analysis Parameters
+  REGIME_ADX_PERIOD: number;
+  REGIME_ADX_WEAK_TREND_THRESHOLD: number;
+  REGIME_ADX_STRONG_TREND_THRESHOLD: number;
+  REGIME_BBW_PERIOD: number;
+  REGIME_BBW_STD_DEV: number;
+  REGIME_BBW_LOW_THRESHOLD: number;
+  REGIME_BBW_HIGH_THRESHOLD: number;
+  
+  // Trend Following Strategy Parameters
+  TREND_EMA_FAST_PERIOD: number;
+  TREND_EMA_MEDIUM_PERIOD: number;
+  TREND_EMA_SLOW_PERIOD: number;
+  TREND_RSI_PERIOD: number;
+  TREND_RSI_OVERBOUGHT: number;
+  TREND_RSI_OVERSOLD: number;
+  TREND_RSI_BULL_ZONE_MIN: number;
+  TREND_RSI_BEAR_ZONE_MAX: number;
+  TREND_MACD_FAST: number;
+  TREND_MACD_SLOW: number;
+  TREND_MACD_SIGNAL: number;
+  TREND_ATR_PERIOD_SL_TP: number;
+  TREND_ATR_MULTIPLIER_SL: number;
+  TREND_TP_RR_RATIO: number;
+  TREND_MIN_SIGNAL_STRENGTH: number;
+  TREND_LEVERAGE_TIERS_JSON: string;
+  
+  // Range Trading Strategy Parameters
+  RANGE_RSI_PERIOD: number;
+  RANGE_RSI_OVERBOUGHT: number;
+  RANGE_RSI_OVERSOLD: number;
+  RANGE_BBANDS_PERIOD: number;
+  RANGE_BBANDS_STD_DEV: number;
+  RANGE_ATR_PERIOD_SL_TP: number;
+  RANGE_ATR_MULTIPLIER_SL: number;
+  RANGE_TP_RR_RATIO: number;
+  RANGE_MIN_SIGNAL_STRENGTH: number;
+  RANGE_LEVERAGE_TIERS_JSON: string;
+  
+  // Logging Settings
+  LOG_DIR: string;
+  BOT_ENGINE_LOG_FILE: string;
+  API_SERVER_LOG_FILE: string;
+  MAX_LOG_FILE_SIZE_MB: number;
+  LOG_FILE_BACKUP_COUNT: number;
+}
+
+export type SystemSettingsUpdate = Partial<SystemSettings>;
+
+export const getSystemSettings = async (): Promise<SystemSettings> => {
+  try {
+    console.log(`apiClient: Fetching system settings from ${CONFIG.API_BASE_URL}/settings/`);
+    const response = await apiClient.get<SystemSettings>(`/settings/`);
+    console.log("apiClient: Fetched System Settings:", response.data);
+    return response.data;
+  } catch (error) {
+    console.error('apiClient: Error fetching system settings:', error);
+    throw error;
+  }
+};
+
+export const updateSystemSettings = async (settingsUpdate: SystemSettingsUpdate): Promise<SystemSettings> => {
+  try {
+    console.log(`apiClient: Updating system settings at ${CONFIG.API_BASE_URL}/settings/ with payload:`, settingsUpdate);
+    const response = await apiClient.put<SystemSettings>(`/settings/`, settingsUpdate);
+    console.log("apiClient: Updated System Settings:", response.data);
+    return response.data;
+  } catch (error) {
+    console.error('apiClient: Error updating system settings:', error);
+    throw error;
+  }
+};
+
+export const resetSystemSettings = async (): Promise<{ status: string; message: string }> => {
+  try {
+    console.log(`apiClient: Resetting system settings at ${CONFIG.API_BASE_URL}/settings/reset`);
+    const response = await apiClient.post<{ status: string; message: string }>(`/settings/reset`);
+    console.log("apiClient: Reset System Settings:", response.data);
+    return response.data;
+  } catch (error) {
+    console.error('apiClient: Error resetting system settings:', error);
     throw error;
   }
 };

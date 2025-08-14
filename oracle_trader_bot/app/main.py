@@ -25,6 +25,7 @@ from app.api.endpoints import bot_management_api as bot_management_router
 from app.api.endpoints import server_logs_api as server_logs_router
 from app.api.endpoints import analysis_logs_websocket as analysis_logs_router
 from app.api.endpoints import health as health_router
+from app.api.endpoints import settings_api as settings_router
 os.makedirs(settings.LOG_DIR, exist_ok=True)
 api_server_log_path = os.path.join(settings.LOG_DIR, settings.
     API_SERVER_LOG_FILE)
@@ -240,6 +241,8 @@ app.include_router(analysis_logs_router.router, prefix='/api/v1', tags=[
     'Analysis Logs (WebSocket)'])
 app.include_router(health_router.router, prefix='/api/v1/health', tags=[
     'Health Monitoring'])
+app.include_router(settings_router.router, prefix='/api/v1/settings', tags=[
+    'System Settings'])
 
 
 @app.get('/', include_in_schema=False, response_class=HTMLResponse)
