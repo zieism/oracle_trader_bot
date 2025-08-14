@@ -5,7 +5,7 @@ import {
   updateBotSettings, 
   BotSettingsData,
   getAvailableSymbols 
-} from '@services/apiService';
+} from '@services/apiClient';
 import {
   Container, Typography, Paper, Grid, TextField, Button, CircularProgress,
   Alert, Select, MenuItem, FormControl, InputLabel, Box, Autocomplete, Chip, 

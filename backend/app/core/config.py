@@ -1,4 +1,4 @@
-# app/core/config.py
+# backend/app/core/config.py
 from pydantic_settings import BaseSettings
 from typing import List, Optional, Tuple, Any
 from pydantic import Field, model_validator 
@@ -7,80 +7,13 @@ import os # Import os module
 
 class Settings(BaseSettings):
     PROJECT_NAME: str = "Oracle Trader Bot"
-    VERSION: str = "1.0.0"
     DEBUG: bool = False
-
-    # App Startup Mode Settings
-    APP_STARTUP_MODE: str = Field(default="lite", description="Startup mode: 'lite' (DB optional) or 'full' (DB required)")
-    SKIP_DB_INIT: bool = Field(default=True, description="Skip DB initialization on startup")
-
-    @model_validator(mode='after')
-    def _validate_startup_mode(cls, instance: 'Settings') -> 'Settings':
-        """Validate startup mode and sync with SKIP_DB_INIT."""
-        if instance.APP_STARTUP_MODE not in ["lite", "full"]:
-            raise ValueError("APP_STARTUP_MODE must be 'lite' or 'full'")
-        
-        # Sync SKIP_DB_INIT with APP_STARTUP_MODE
-        if instance.APP_STARTUP_MODE == "lite":
-            instance.SKIP_DB_INIT = True
-        elif instance.APP_STARTUP_MODE == "full":
-            instance.SKIP_DB_INIT = False
-            
-        return instance
 
     # KuCoin API Credentials
     KUCOIN_API_KEY: Optional[str] = None
     KUCOIN_API_SECRET: Optional[str] = None
     KUCOIN_API_PASSPHRASE: Optional[str] = None
-    KUCOIN_API_BASE_URL: str = "https://api-futures.kucoin.com"
-    KUCOIN_SANDBOX: bool = Field(default=False, description="Use KuCoin sandbox environment")
-
-    # Server Configuration
-    SERVER_PUBLIC_IP: str = Field(default="150.241.85.30", description="Public IP for CORS and external access")
-    API_INTERNAL_BASE_URL: str = Field(default="http://127.0.0.1:8000", description="Internal API URL for bot communication")
-    
-    # CORS Configuration
-    CORS_ALLOWED_ORIGINS: List[str] = Field(
-        default_factory=lambda: [
-            "http://localhost",
-            "http://localhost:5173", 
-            "http://localhost:3000",
-            "http://localhost:8080",
-            "http://localhost:4173",
-            "https://localhost:5173",
-            "http://127.0.0.1:5173", 
-            "http://127.0.0.1:3000"
-        ],
-        description="List of allowed CORS origins"
-    )
-
-    @property 
-    def get_all_cors_origins(self) -> List[str]:
-        """Get all CORS origins including dynamically generated ones with SERVER_PUBLIC_IP."""
-        origins = self.CORS_ALLOWED_ORIGINS.copy()
-        
-        # Add dynamic origins with SERVER_PUBLIC_IP
-        server_origins = [
-            f"http://{self.SERVER_PUBLIC_IP}:5173",
-            f"http://{self.SERVER_PUBLIC_IP}",
-            f"http://{self.SERVER_PUBLIC_IP}:5174", 
-            f"http://{self.SERVER_PUBLIC_IP}:3000",
-            f"https://{self.SERVER_PUBLIC_IP}"
-        ]
-        origins.extend(server_origins)
-        return origins
-
-    def has_exchange_credentials(self) -> bool:
-        """Check if all required KuCoin API credentials are available."""
-        return all([
-            self.KUCOIN_API_KEY,
-            self.KUCOIN_API_SECRET, 
-            self.KUCOIN_API_PASSPHRASE
-        ])
-
-    def is_sandbox(self) -> bool:
-        """Check if running in sandbox mode."""
-        return self.KUCOIN_SANDBOX 
+    KUCOIN_API_BASE_URL: str = "https://api-futures.kucoin.com" 
 
     # Database Credentials
     POSTGRES_SERVER: str = "localhost"
@@ -160,20 +93,6 @@ class Settings(BaseSettings):
     # These fields will hold the parsed list of tuples
     TREND_LEVERAGE_TIERS: List[Tuple[float, int]] = Field(default_factory=list, validate_default=False)
     RANGE_LEVERAGE_TIERS: List[Tuple[float, int]] = Field(default_factory=list, validate_default=False)
-
-    @model_validator(mode='after')
-    def _validate_startup_mode(cls, instance: 'Settings') -> 'Settings':
-        """Validate startup mode and sync with SKIP_DB_INIT."""
-        if instance.APP_STARTUP_MODE not in ["lite", "full"]:
-            raise ValueError("APP_STARTUP_MODE must be 'lite' or 'full'")
-        
-        # Sync SKIP_DB_INIT with APP_STARTUP_MODE
-        if instance.APP_STARTUP_MODE == "lite":
-            instance.SKIP_DB_INIT = True
-        elif instance.APP_STARTUP_MODE == "full":
-            instance.SKIP_DB_INIT = False
-            
-        return instance
 
     @model_validator(mode='after')
     def _parse_leverage_tiers_from_json(cls, instance: 'Settings') -> 'Settings':

@@ -15,7 +15,7 @@ import {
     startBot,
     stopBot,
     BotStatusResponse
-} from '@services/apiService';
+} from '@services/apiClient';
 import {
     Typography, CircularProgress, Alert, Box, Grid, Paper,
     List, ListItem, ListItemText, Divider, TableContainer, Table,

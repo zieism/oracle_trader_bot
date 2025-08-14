@@ -1,6 +1,6 @@
 // src/pages/TradesLogPage.tsx
 import React, { useEffect, useState, useCallback } from 'react';
-import { getTradesHistory, TradeData, getTotalTradesCount } from '@services/apiService'; // getTotalTradesCount added
+import { getTradesHistory, TradeData, getTotalTradesCount } from '@services/apiClient'; // getTotalTradesCount added
 
 import Container from '@mui/material/Container';
 import Typography from '@mui/material/Typography';

@@ -43,8 +43,9 @@ file_handler.setFormatter(logging.Formatter(
     '%(asctime)s - %(name)s - %(levelname)s - [%(filename)s:%(lineno)d] [BotEngine] %(message)s'
     , datefmt='%Y-%m-%d %H:%M:%S'))
 logger.addHandler(file_handler)
-ANALYSIS_LOG_API_URL = (
-    'http://127.0.0.1:8000/api/v1/analysis-logs/internal-publish')
+
+# Use centralized internal API URL from settings
+ANALYSIS_LOG_API_URL = f"{settings.API_INTERNAL_BASE_URL}/api/v1/analysis-logs/internal-publish"
 
 
 async def send_analysis_log(log_data: Dict[str, Any]):

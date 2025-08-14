@@ -1,0 +1,636 @@
+{
+  "imports": {
+    "D:\\GITHUB\\oracle_trader_bot\\create_baseline_inventory.py": [
+      "json",
+      "re",
+      "os",
+      "pathlib",
+      "typing",
+      "ast"
+    ],
+    "D:\\GITHUB\\oracle_trader_bot\\quick_test.py": [
+      "asyncio",
+      "aiohttp"
+    ],
+    "D:\\GITHUB\\oracle_trader_bot\\repo_xray.py": [
+      "os",
+      "re",
+      "json",
+      "ast",
+      "sys",
+      "requests",
+      "typing",
+      "pathlib"
+    ],
+    "D:\\GITHUB\\oracle_trader_bot\\run_server.py": [
+      "uvicorn",
+      "os",
+      "sys"
+    ],
+    "D:\\GITHUB\\oracle_trader_bot\\show_fixes.py": [],
+    "D:\\GITHUB\\oracle_trader_bot\\smoke_test.py": [
+      "asyncio",
+      "aiohttp",
+      "json"
+    ],
+    "D:\\GITHUB\\oracle_trader_bot\\test_no_auth_endpoints.py": [
+      "asyncio",
+      "aiohttp",
+      "json"
+    ],
+    "D:\\GITHUB\\oracle_trader_bot\\backend\\__init__.py": [],
+    "D:\\GITHUB\\oracle_trader_bot\\backend\\app\\__init__.py": [],
+    "D:\\GITHUB\\oracle_trader_bot\\backend\\app\\analysis\\__init__.py": [
+      "warnings",
+      "backend.app.services.market_regime_service"
+    ],
+    "D:\\GITHUB\\oracle_trader_bot\\backend\\app\\api\\__init__.py": [],
+    "D:\\GITHUB\\oracle_trader_bot\\backend\\app\\api\\routers\\analysis.py": [
+      "asyncio",
+      "json",
+      "logging",
+      "typing",
+      "fastapi",
+      "pydantic",
+      "pandas",
+      "numpy",
+      "app.api.dependencies",
+      "app.exchange_clients.kucoin_futures_client",
+      "app.indicators.technical_indicators",
+      "app.analysis.market_regime",
+      "app.schemas.market_regime_schemas"
+    ],
+    "D:\\GITHUB\\oracle_trader_bot\\backend\\app\\api\\routers\\exchange.py": [
+      "time",
+      "logging",
+      "fastapi",
+      "typing",
+      "app.api.dependencies",
+      "app.exchange_clients.kucoin_futures_client",
+      "app.core.config"
+    ],
+    "D:\\GITHUB\\oracle_trader_bot\\backend\\app\\api\\routers\\logs.py": [
+      "os",
+      "re",
+      "logging",
+      "typing",
+      "fastapi",
+      "app.core.config"
+    ],
+    "D:\\GITHUB\\oracle_trader_bot\\backend\\app\\api\\routers\\settings.py": [
+      "fastapi",
+      "sqlalchemy.ext.asyncio",
+      "typing",
+      "app.db.session",
+      "app.schemas.bot_settings",
+      "app.crud",
+      "app.models.bot_settings",
+      "app.core"
+    ],
+    "D:\\GITHUB\\oracle_trader_bot\\backend\\app\\api\\routers\\trades.py": [
+      "fastapi",
+      "sqlalchemy.ext.asyncio",
+      "typing",
+      "app.db.session",
+      "app.schemas.trade",
+      "app.crud",
+      "app.models.trade"
+    ],
+    "D:\\GITHUB\\oracle_trader_bot\\backend\\app\\api\\routers\\trading.py": [
+      "fastapi",
+      "typing",
+      "logging",
+      "ccxt",
+      "datetime",
+      "app.core.config",
+      "app.api.dependencies",
+      "app.db.session",
+      "app.exchange_clients.kucoin_futures_client",
+      "app.schemas.trading_signal",
+      "app.schemas.trade",
+      "app.models.trade",
+      "app.crud",
+      "sqlalchemy.ext.asyncio"
+    ],
+    "D:\\GITHUB\\oracle_trader_bot\\backend\\app\\api\\routers\\__init__.py": [],
+    "D:\\GITHUB\\oracle_trader_bot\\backend\\app\\core\\config.py": [
+      "pydantic_settings",
+      "typing",
+      "pydantic",
+      "json",
+      "os"
+    ],
+    "D:\\GITHUB\\oracle_trader_bot\\backend\\app\\core\\logging.py": [
+      "logging",
+      "os",
+      "sys",
+      "logging.handlers",
+      "typing"
+    ],
+    "D:\\GITHUB\\oracle_trader_bot\\backend\\app\\core\\__init__.py": [],
+    "D:\\GITHUB\\oracle_trader_bot\\backend\\app\\exchange_clients\\__init__.py": [
+      "warnings",
+      "backend.app.services.kucoin_futures_client"
+    ],
+    "D:\\GITHUB\\oracle_trader_bot\\backend\\app\\indicators\\technical_indicators.py": [
+      "numpy",
+      "pandas",
+      "pandas_ta",
+      "logging",
+      "typing"
+    ],
+    "D:\\GITHUB\\oracle_trader_bot\\backend\\app\\indicators\\__init__.py": [
+      "technical_indicators"
+    ],
+    "D:\\GITHUB\\oracle_trader_bot\\backend\\app\\services\\kucoin_futures_client.py": [
+      "asyncio",
+      "time",
+      "json",
+      "logging",
+      "typing",
+      "ccxt.async_support",
+      "app.core.config",
+      "aiohttp",
+      "pandas"
+    ],
+    "D:\\GITHUB\\oracle_trader_bot\\backend\\app\\services\\market_regime_service.py": [
+      "pandas",
+      "numpy",
+      "logging",
+      "typing",
+      "app.schemas.market_regime_schemas"
+    ],
+    "D:\\GITHUB\\oracle_trader_bot\\backend\\app\\services\\position_monitor.py": [
+      "logging",
+      "typing",
+      "datetime",
+      "sqlalchemy.ext.asyncio",
+      "app.models.trade",
+      "app.schemas.trade",
+      "app.crud",
+      "app.services.kucoin_futures_client"
+    ],
+    "D:\\GITHUB\\oracle_trader_bot\\backend\\app\\services\\__init__.py": [
+      "kucoin_futures_client",
+      "position_monitor",
+      "market_regime_service"
+    ],
+    "D:\\GITHUB\\oracle_trader_bot\\backend\\app\\strategies\\range_trading_strategy.py": [
+      "pandas",
+      "numpy",
+      "logging",
+      "typing",
+      "datetime",
+      "app.schemas.trading_signal",
+      "app.schemas.market_regime_schemas",
+      "app.core.config"
+    ],
+    "D:\\GITHUB\\oracle_trader_bot\\backend\\app\\strategies\\trend_following_strategy.py": [
+      "pandas",
+      "numpy",
+      "logging",
+      "typing",
+      "datetime",
+      "app.schemas.trading_signal",
+      "app.schemas.market_regime_schemas",
+      "app.core.config"
+    ],
+    "D:\\GITHUB\\oracle_trader_bot\\backend\\app\\strategies\\__init__.py": [
+      "trend_following_strategy",
+      "range_trading_strategy"
+    ],
+    "D:\\GITHUB\\oracle_trader_bot\\oracle_trader_bot\\bot_engine.py": [
+      "asyncio",
+      "time",
+      "datetime",
+      "typing",
+      "logging",
+      "signal",
+      "sys",
+      "pandas",
+      "os",
+      "logging.handlers",
+      "json",
+      "app.core.config",
+      "app.db.session",
+      "sqlalchemy.orm",
+      "sqlalchemy.ext.asyncio",
+      "app.services.kucoin_futures_client",
+      "app.indicators.technical_indicators",
+      "app.services.market_regime_service",
+      "app.strategies.trend_following_strategy",
+      "app.strategies.range_trading_strategy",
+      "app.schemas.trading_signal",
+      "app.schemas.trade",
+      "app.models.trade",
+      "app.models.bot_settings",
+      "app.crud",
+      "aiohttp",
+      "dotenv"
+    ],
+    "D:\\GITHUB\\oracle_trader_bot\\oracle_trader_bot\\__init__.py": [
+      "warnings",
+      "sys",
+      "pathlib"
+    ],
+    "D:\\GITHUB\\oracle_trader_bot\\oracle_trader_bot\\app\\main.py": [
+      "logging",
+      "contextlib",
+      "fastapi",
+      "fastapi.responses",
+      "fastapi.middleware.cors",
+      "typing",
+      "os",
+      "logging.handlers",
+      "sys",
+      "fastui",
+      "aiohttp",
+      "app.core.config",
+      "app.db.lazy_session",
+      "app.db.session",
+      "app.models",
+      "app.api.endpoints",
+      "app.api.endpoints",
+      "app.api.endpoints",
+      "app.api.endpoints",
+      "app.api.endpoints",
+      "app.api.endpoints",
+      "app.api.endpoints",
+      "app.api.endpoints",
+      "app.api.endpoints",
+      "app.api.endpoints",
+      "app.api.endpoints",
+      "app.api.endpoints",
+      "app.services.kucoin_futures_client",
+      "app.crud",
+      "app.core"
+    ],
+    "D:\\GITHUB\\oracle_trader_bot\\oracle_trader_bot\\app\\__init__.py": [],
+    "D:\\GITHUB\\oracle_trader_bot\\oracle_trader_bot\\app\\analysis\\market_regime.py": [
+      "pandas",
+      "numpy",
+      "typing",
+      "logging",
+      "app.schemas.market_regime_schemas"
+    ],
+    "D:\\GITHUB\\oracle_trader_bot\\oracle_trader_bot\\app\\analysis\\__init__.py": [],
+    "D:\\GITHUB\\oracle_trader_bot\\oracle_trader_bot\\app\\api\\dependencies.py": [
+      "fastapi",
+      "sqlalchemy.ext.asyncio",
+      "typing",
+      "app.exchange_clients.kucoin_futures_client",
+      "app.db.lazy_session",
+      "logging"
+    ],
+    "D:\\GITHUB\\oracle_trader_bot\\oracle_trader_bot\\app\\api\\__init__.py": [],
+    "D:\\GITHUB\\oracle_trader_bot\\oracle_trader_bot\\app\\api\\endpoints\\analysis_logs_websocket.py": [
+      "asyncio",
+      "json",
+      "logging",
+      "typing",
+      "fastapi",
+      "pydantic"
+    ],
+    "D:\\GITHUB\\oracle_trader_bot\\oracle_trader_bot\\app\\api\\endpoints\\bot_management_api.py": [
+      "fastapi",
+      "typing",
+      "app.core"
+    ],
+    "D:\\GITHUB\\oracle_trader_bot\\oracle_trader_bot\\app\\api\\endpoints\\bot_settings_api.py": [
+      "fastapi",
+      "sqlalchemy.ext.asyncio",
+      "typing",
+      "app.db.session",
+      "app.schemas.bot_settings",
+      "app.crud",
+      "app.models.bot_settings"
+    ],
+    "D:\\GITHUB\\oracle_trader_bot\\oracle_trader_bot\\app\\api\\endpoints\\exchange_info.py": [
+      "fastapi",
+      "typing",
+      "time",
+      "app.api.dependencies",
+      "app.exchange_clients.kucoin_futures_client",
+      "app.core.config",
+      "app.exchange_clients.kucoin_futures_client",
+      "app.exchange_clients.kucoin_futures_client"
+    ],
+    "D:\\GITHUB\\oracle_trader_bot\\oracle_trader_bot\\app\\api\\endpoints\\frontend_fastui.py": [
+      "fastapi",
+      "fastui",
+      "fastui",
+      "fastui.components.display",
+      "fastui.events",
+      "pydantic",
+      "datetime",
+      "typing",
+      "logging",
+      "app.api.dependencies",
+      "app.exchange_clients.kucoin_futures_client"
+    ],
+    "D:\\GITHUB\\oracle_trader_bot\\oracle_trader_bot\\app\\api\\endpoints\\health.py": [
+      "fastapi",
+      "pydantic",
+      "typing",
+      "logging",
+      "app.core.config",
+      "app.db.lazy_session",
+      "app.exchange_clients.kucoin_futures_client",
+      "datetime",
+      "datetime",
+      "datetime",
+      "datetime"
+    ],
+    "D:\\GITHUB\\oracle_trader_bot\\oracle_trader_bot\\app\\api\\endpoints\\market_data.py": [
+      "fastapi",
+      "typing",
+      "logging",
+      "pandas",
+      "numpy",
+      "app.api.dependencies",
+      "app.exchange_clients.kucoin_futures_client",
+      "app.indicators.technical_indicators",
+      "app.analysis.market_regime",
+      "app.schemas.market_regime_schemas"
+    ],
+    "D:\\GITHUB\\oracle_trader_bot\\oracle_trader_bot\\app\\api\\endpoints\\order_management.py": [
+      "fastapi",
+      "typing",
+      "logging",
+      "ccxt",
+      "datetime",
+      "app.api.dependencies",
+      "app.db.session",
+      "app.exchange_clients.kucoin_futures_client",
+      "app.core.config",
+      "pydantic",
+      "sqlalchemy.ext.asyncio",
+      "app.crud",
+      "app.models.trade",
+      "app.schemas.trade"
+    ],
+    "D:\\GITHUB\\oracle_trader_bot\\oracle_trader_bot\\app\\api\\endpoints\\server_logs_api.py": [
+      "fastapi",
+      "typing",
+      "os",
+      "re",
+      "logging",
+      "app.core.config"
+    ],
+    "D:\\GITHUB\\oracle_trader_bot\\oracle_trader_bot\\app\\api\\endpoints\\strategy_signals.py": [
+      "fastapi",
+      "typing",
+      "logging",
+      "pandas",
+      "app.api.dependencies",
+      "app.exchange_clients.kucoin_futures_client",
+      "app.indicators.technical_indicators",
+      "app.analysis.market_regime",
+      "app.schemas.market_regime_schemas",
+      "app.schemas.trading_signal",
+      "app.strategies.trend_following_strategy",
+      "app.strategies.range_trading_strategy"
+    ],
+    "D:\\GITHUB\\oracle_trader_bot\\oracle_trader_bot\\app\\api\\endpoints\\trades.py": [
+      "fastapi",
+      "sqlalchemy.ext.asyncio",
+      "typing",
+      "app.db.session",
+      "app.schemas.trade",
+      "app.crud",
+      "app.models.trade"
+    ],
+    "D:\\GITHUB\\oracle_trader_bot\\oracle_trader_bot\\app\\api\\endpoints\\trading.py": [
+      "fastapi",
+      "typing",
+      "logging",
+      "ccxt",
+      "datetime",
+      "app.core.config",
+      "app.api.dependencies",
+      "app.db.session",
+      "app.exchange_clients.kucoin_futures_client",
+      "app.schemas.trading_signal",
+      "app.schemas.trade",
+      "app.models.trade",
+      "app.crud",
+      "sqlalchemy.ext.asyncio"
+    ],
+    "D:\\GITHUB\\oracle_trader_bot\\oracle_trader_bot\\app\\api\\endpoints\\__init__.py": [],
+    "D:\\GITHUB\\oracle_trader_bot\\oracle_trader_bot\\app\\core\\bot_process_manager.py": [
+      "subprocess",
+      "os",
+      "signal",
+      "logging",
+      "sys",
+      "time",
+      "typing",
+      "psutil"
+    ],
+    "D:\\GITHUB\\oracle_trader_bot\\oracle_trader_bot\\app\\core\\config.py": [
+      "pydantic_settings",
+      "typing",
+      "pydantic",
+      "json",
+      "os"
+    ],
+    "D:\\GITHUB\\oracle_trader_bot\\oracle_trader_bot\\app\\core\\__init__.py": [],
+    "D:\\GITHUB\\oracle_trader_bot\\oracle_trader_bot\\app\\crud\\crud_bot_settings.py": [
+      "sqlalchemy.ext.asyncio",
+      "sqlalchemy.future",
+      "typing",
+      "app.models.bot_settings",
+      "app.schemas.bot_settings",
+      "app.core.config"
+    ],
+    "D:\\GITHUB\\oracle_trader_bot\\oracle_trader_bot\\app\\crud\\crud_trade.py": [
+      "sqlalchemy.ext.asyncio",
+      "sqlalchemy.future",
+      "sqlalchemy",
+      "typing",
+      "datetime",
+      "app.models.trade",
+      "app.schemas.trade"
+    ],
+    "D:\\GITHUB\\oracle_trader_bot\\oracle_trader_bot\\app\\crud\\__init__.py": [],
+    "D:\\GITHUB\\oracle_trader_bot\\oracle_trader_bot\\app\\db\\lazy_session.py": [
+      "sqlalchemy.ext.asyncio",
+      "sqlalchemy.orm",
+      "typing",
+      "asyncio",
+      "logging",
+      "app.core.config",
+      "app.models"
+    ],
+    "D:\\GITHUB\\oracle_trader_bot\\oracle_trader_bot\\app\\db\\session.py": [
+      "sqlalchemy.ext.asyncio",
+      "sqlalchemy.orm",
+      "sqlalchemy.exc",
+      "sqlalchemy",
+      "app.core.config",
+      "logging",
+      "typing",
+      "contextlib",
+      "fastapi",
+      "app.models"
+    ],
+    "D:\\GITHUB\\oracle_trader_bot\\oracle_trader_bot\\app\\db\\__init__.py": [],
+    "D:\\GITHUB\\oracle_trader_bot\\oracle_trader_bot\\app\\exchange_clients\\kucoin_futures_client.py": [
+      "asyncio",
+      "time",
+      "json",
+      "typing",
+      "ccxt.async_support",
+      "app.core.config",
+      "aiohttp",
+      "pandas"
+    ],
+    "D:\\GITHUB\\oracle_trader_bot\\oracle_trader_bot\\app\\exchange_clients\\__init__.py": [],
+    "D:\\GITHUB\\oracle_trader_bot\\oracle_trader_bot\\app\\indicators\\technical_indicators.py": [
+      "numpy",
+      "pandas",
+      "pandas_ta",
+      "typing"
+    ],
+    "D:\\GITHUB\\oracle_trader_bot\\oracle_trader_bot\\app\\indicators\\__init__.py": [],
+    "D:\\GITHUB\\oracle_trader_bot\\oracle_trader_bot\\app\\models\\bot_settings.py": [
+      "sqlalchemy",
+      "sqlalchemy.dialects.postgresql",
+      "sqlalchemy.sql",
+      "enum",
+      "typing",
+      "app.db.session",
+      "app.core.config"
+    ],
+    "D:\\GITHUB\\oracle_trader_bot\\oracle_trader_bot\\app\\models\\trade.py": [
+      "sqlalchemy",
+      "sqlalchemy.sql",
+      "enum",
+      "app.db.session"
+    ],
+    "D:\\GITHUB\\oracle_trader_bot\\oracle_trader_bot\\app\\models\\__init__.py": [
+      "trade",
+      "bot_settings"
+    ],
+    "D:\\GITHUB\\oracle_trader_bot\\oracle_trader_bot\\app\\schemas\\bot_settings.py": [
+      "pydantic",
+      "typing",
+      "datetime",
+      "app.models.bot_settings"
+    ],
+    "D:\\GITHUB\\oracle_trader_bot\\oracle_trader_bot\\app\\schemas\\market_analysis.py": [
+      "pydantic",
+      "typing"
+    ],
+    "D:\\GITHUB\\oracle_trader_bot\\oracle_trader_bot\\app\\schemas\\market_regime_schemas.py": [
+      "pydantic",
+      "typing"
+    ],
+    "D:\\GITHUB\\oracle_trader_bot\\oracle_trader_bot\\app\\schemas\\trade.py": [
+      "pydantic",
+      "typing",
+      "datetime",
+      "app.models.trade"
+    ],
+    "D:\\GITHUB\\oracle_trader_bot\\oracle_trader_bot\\app\\schemas\\trading_signal.py": [
+      "pydantic",
+      "typing",
+      "datetime",
+      "app.models.trade"
+    ],
+    "D:\\GITHUB\\oracle_trader_bot\\oracle_trader_bot\\app\\schemas\\__init__.py": [],
+    "D:\\GITHUB\\oracle_trader_bot\\oracle_trader_bot\\app\\services\\kucoin_futures_client.py": [
+      "warnings",
+      "app.exchange_clients.kucoin_futures_client"
+    ],
+    "D:\\GITHUB\\oracle_trader_bot\\oracle_trader_bot\\app\\services\\market_regime_service.py": [
+      "warnings",
+      "app.analysis.market_regime"
+    ],
+    "D:\\GITHUB\\oracle_trader_bot\\oracle_trader_bot\\app\\services\\position_monitor.py": [
+      "logging",
+      "typing",
+      "datetime",
+      "sqlalchemy.ext.asyncio",
+      "app.models.trade",
+      "app.schemas.trade",
+      "app.crud",
+      "app.exchange_clients.kucoin_futures_client"
+    ],
+    "D:\\GITHUB\\oracle_trader_bot\\oracle_trader_bot\\app\\services\\__init__.py": [],
+    "D:\\GITHUB\\oracle_trader_bot\\oracle_trader_bot\\app\\strategies\\range_trading_strategy.py": [
+      "pandas",
+      "numpy",
+      "typing",
+      "datetime",
+      "logging",
+      "app.schemas.trading_signal",
+      "app.schemas.market_regime_schemas",
+      "app.core.config"
+    ],
+    "D:\\GITHUB\\oracle_trader_bot\\oracle_trader_bot\\app\\strategies\\trend_following_strategy.py": [
+      "pandas",
+      "numpy",
+      "typing",
+      "datetime",
+      "app.schemas.trading_signal",
+      "app.schemas.market_regime_schemas",
+      "app.core.config"
+    ],
+    "D:\\GITHUB\\oracle_trader_bot\\oracle_trader_bot\\app\\strategies\\__init__.py": [],
+    "D:\\GITHUB\\oracle_trader_bot\\scripts\\rewrite_all_imports.py": [
+      "argparse",
+      "subprocess",
+      "sys",
+      "pathlib"
+    ],
+    "D:\\GITHUB\\oracle_trader_bot\\scripts\\rewrite_backend_imports.py": [
+      "ast",
+      "argparse",
+      "os",
+      "sys",
+      "pathlib",
+      "typing",
+      "re",
+      "astor"
+    ],
+    "D:\\GITHUB\\oracle_trader_bot\\scripts\\rewrite_phase2_imports.py": [
+      "ast",
+      "argparse",
+      "os",
+      "sys",
+      "pathlib",
+      "typing",
+      "re",
+      "astor"
+    ],
+    "D:\\GITHUB\\oracle_trader_bot\\tests\\test_exchange_client_no_auth.py": [
+      "pytest",
+      "asyncio",
+      "unittest.mock",
+      "app.exchange_clients.kucoin_futures_client",
+      "app.core.config"
+    ],
+    "D:\\GITHUB\\oracle_trader_bot\\tests\\test_health_endpoints_no_auth.py": [
+      "pytest",
+      "unittest.mock",
+      "fastapi.testclient",
+      "app.main",
+      "app.core.config",
+      "app.exchange_clients.kucoin_futures_client",
+      "app.exchange_clients.kucoin_futures_client"
+    ],
+    "D:\\GITHUB\\oracle_trader_bot\\tests\\test_integration_smoke.py": [
+      "requests",
+      "time"
+    ],
+    "D:\\GITHUB\\oracle_trader_bot\\tests\\test_trading_endpoint_no_auth.py": [
+      "pytest",
+      "unittest.mock",
+      "fastapi.testclient",
+      "fastapi",
+      "app.main",
+      "app.exchange_clients.kucoin_futures_client"
+    ]
+  }
+}

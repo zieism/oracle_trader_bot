@@ -205,16 +205,17 @@ app = FastAPI(
     version=settings.VERSION,
     lifespan=lifespan
 )
-SERVER_PUBLIC_IP = '150.241.85.30'
-origins = ['http://localhost', 'http://localhost:5173',
-    'http://localhost:3000', 'http://localhost:8080',
-    'http://localhost:4173', f'http://{SERVER_PUBLIC_IP}:5173',
-    f'http://{SERVER_PUBLIC_IP}', f'http://{SERVER_PUBLIC_IP}:5174',
-    f'http://{SERVER_PUBLIC_IP}:3000', f'https://{SERVER_PUBLIC_IP}',
-    'https://localhost:5173', 'http://127.0.0.1:5173', 'http://127.0.0.1:3000']
-app.add_middleware(CORSMiddleware, allow_origins=origins, allow_credentials
-    =True, allow_methods=['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS',
-    'PATCH'], allow_headers=['*'], expose_headers=['*'])
+
+# Use centralized CORS configuration from settings
+origins = settings.get_all_cors_origins
+app.add_middleware(
+    CORSMiddleware, 
+    allow_origins=origins, 
+    allow_credentials=True,
+    allow_methods=['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'], 
+    allow_headers=['*'], 
+    expose_headers=['*']
+)
 app.include_router(trades_router.router, prefix='/api/v1/db/trades', tags=[
     'Database - Trades'])
 app.include_router(exchange_info_router.router, prefix='/api/v1/exchange',

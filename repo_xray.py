@@ -203,7 +203,26 @@ def analyze_frontend(files: List[Path]) -> Dict[str, Any]:
     return {"api_calls": api_calls, "routes": routes}
 
 # ---------- Live OpenAPI Analysis ----------
-def fetch_live_openapi(base_url: str = "http://localhost:8000") -> Optional[Dict[str, Any]]:
+def fetch_live_openapi(base_url: str = None) -> Optional[Dict[str, Any]]:
+    """
+    Attempt to fetch OpenAPI spec from a running FastAPI server.
+    
+    Args:
+        base_url: Server URL, defaults to settings.API_INTERNAL_BASE_URL or localhost:8000
+    
+    Returns:
+        Parsed OpenAPI spec dict, or None if unavailable
+    """
+    if base_url is None:
+        # Try to use centralized config, fallback to localhost
+        try:
+            import sys
+            import os
+            sys.path.append(os.path.join(os.path.dirname(__file__), 'oracle_trader_bot'))
+            from app.core.config import settings
+            base_url = settings.API_INTERNAL_BASE_URL.rstrip('/')
+        except ImportError:
+            base_url = "http://localhost:8000"
     """Fetch OpenAPI spec from running server"""
     try:
         openapi_url = f"{base_url}/openapi.json"
@@ -412,7 +431,7 @@ def main():
             if len(openapi_result['live_only_endpoints']) > 5:
                 print(f"      - ... and {len(openapi_result['live_only_endpoints']) - 5} more")
     else:
-        print("⚠️  No live server detected at http://localhost:8000 - skipping OpenAPI analysis")
+        print(f"⚠️  No live server detected at {base_url} - skipping OpenAPI analysis")
 
     write_json("graph.json", {"imports": py_res["imports"]})
     write_json("endpoints.json", py_res["fastapi"]["routes"])

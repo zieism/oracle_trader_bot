@@ -22,43 +22,29 @@ from pathlib import Path
 from typing import Dict, List, Tuple, Optional
 import re
 
-# Import mapping from old paths to new paths
+# Import mapping from old paths to new paths - Phase 2 specific mappings
 BACKEND_IMPORT_MAPPING = {
-    # Core modules
-    'app.core.bot_process_manager': 'backend.app.services.bot_manager',
+    # Services (Phase 2 moves)
+    'app.services.position_monitor': 'app.services.position_monitor',
+    'app.exchange_clients.kucoin_futures_client': 'app.services.kucoin_futures_client',
     
-    # API endpoints → routers (domain-based consolidation)
-    'app.api.endpoints.bot_settings_api': 'backend.app.api.routers.settings',
-    'app.api.endpoints.bot_management_api': 'backend.app.api.routers.settings',
-    'app.api.endpoints.analysis_logs_websocket': 'backend.app.api.routers.analysis', 
-    'app.api.endpoints.strategy_signals': 'backend.app.api.routers.analysis',
-    'app.api.endpoints.trading': 'backend.app.api.routers.trading',
-    'app.api.endpoints.order_management': 'backend.app.api.routers.trading',
-    'app.api.endpoints.trades': 'backend.app.api.routers.trading',
-    'app.api.endpoints.exchange_info': 'backend.app.api.routers.exchange',
-    'app.api.endpoints.market_data': 'backend.app.api.routers.exchange',
-    'app.api.endpoints.server_logs_api': 'backend.app.api.routers.logs',
-    'app.api.endpoints.frontend_fastui': 'backend.app.api.routers.ui',
+    # Strategies (Phase 2 moves)
+    'app.strategies.trend_following_strategy': 'app.strategies.trend_following_strategy',
+    'app.strategies.range_trading_strategy': 'app.strategies.range_trading_strategy',
     
-    # Services
-    'app.services.position_monitor': 'backend.app.services.position_service',
-    'app.exchange_clients.kucoin_futures_client': 'backend.app.exchange.kucoin',
+    # Indicators (Phase 2 moves)
+    'app.indicators.technical_indicators': 'app.indicators.technical_indicators',
     
-    # Strategies (renamed for consistency)
-    'app.strategies.trend_following_strategy': 'backend.app.strategies.trend_following',
-    'app.strategies.range_trading_strategy': 'backend.app.strategies.range_trading',
+    # Analysis service (Phase 2 reorganization)
+    'app.analysis.market_regime': 'app.services.market_regime_service',
     
-    # Indicators
-    'app.indicators.technical_indicators': 'backend.app.indicators.technical',
-    
-    # Direct module paths (keeping unchanged modules)
-    'app.core.config': 'backend.app.core.config',
-    'app.analysis.market_regime': 'backend.app.analysis.market_regime',
-    'app.api.dependencies': 'backend.app.api.dependencies',
-    'app.db': 'backend.app.db',
-    'app.models': 'backend.app.models',
-    'app.schemas': 'backend.app.schemas', 
-    'app.crud': 'backend.app.crud',
+    # Keep existing core and API mappings intact (these will be handled in future phases)
+    'app.core.config': 'app.core.config',
+    'app.api.dependencies': 'app.api.dependencies',
+    'app.db': 'app.db',
+    'app.models': 'app.models',
+    'app.schemas': 'app.schemas', 
+    'app.crud': 'app.crud',
 }
 
 # Alias mapping for imports that need to be renamed in merged files

@@ -14,7 +14,7 @@ import PlayArrowIcon from '@mui/icons-material/PlayArrow';
 import FilterListIcon from '@mui/icons-material/FilterList';
 
 // Import necessary type from apiService (not the setupWebSocket function directly here)
-import { AnalysisLogEntry, setupAnalysisLogWebSocket } from '@services/apiService'; 
+import { AnalysisLogEntry, setupAnalysisLogWebSocket } from '@services/apiClient'; 
 
 // Styled component for symbol coloring
 const SymbolColoredCell = styled(TableCell)<{ symbolcolor: string }>`
