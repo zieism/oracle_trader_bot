@@ -1,0 +1,350 @@
+# .github/workflows/health-monitor.yml
+name: Health Monitor
+
+on:
+  # Run every hour
+  schedule:
+    - cron: '0 * * * *'
+  # Allow manual trigger
+  workflow_dispatch:
+    inputs:
+      target_url:
+        description: 'Target URL to monitor'
+        required: false
+        default: 'https://api.oracletrader.app'
+        type: string
+      notification_level:
+        description: 'Notification level'
+        required: false
+        default: 'failure-only'
+        type: choice
+        options:
+        - 'always'
+        - 'failure-only' 
+        - 'success-only'
+        - 'never'
+
+env:
+  PYTHON_VERSION: '3.11'
+  # Default target URL (can be overridden by workflow_dispatch)
+  TARGET_URL: ${{ github.event.inputs.target_url || 'https://api.oracletrader.app' }}
+  NOTIFICATION_LEVEL: ${{ github.event.inputs.notification_level || 'failure-only' }}
+
+jobs:
+  health-monitor:
+    name: Health Monitor
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python ${{ env.PYTHON_VERSION }}
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install aiohttp
+
+      - name: Run health monitor
+        id: health_check
+        run: |
+          echo "🔍 Running health monitor for ${{ env.TARGET_URL }}"
+          
+          # Run health monitor and capture output
+          if python health_monitor.py --url "${{ env.TARGET_URL }}" --json > health_report.json; then
+            echo "health_status=success" >> $GITHUB_OUTPUT
+            echo "✅ Health check passed"
+          else
+            echo "health_status=failure" >> $GITHUB_OUTPUT
+            echo "❌ Health check failed"
+          fi
+          
+          # Extract key metrics for notifications
+          python -c "
+import json
+import os
+
+with open('health_report.json', 'r') as f:
+    report = json.load(f)
+
+summary = report['summary']
+overall_success = report['overall_success']
+timestamp = report['timestamp']
+
+# Set output variables for notifications
+with open(os.environ['GITHUB_OUTPUT'], 'a') as f:
+    f.write(f'total_checks={summary[\"total_checks\"]}\n')
+    f.write(f'successful_checks={summary[\"successful\"]}\n')
+    f.write(f'failed_checks={summary[\"failed\"]}\n')
+    f.write(f'required_failures={summary[\"required_failures\"]}\n')
+    f.write(f'check_timestamp={timestamp}\n')
+
+# Create failure details for notifications
+if not overall_success:
+    failed_checks = []
+    for check in report['checks']:
+        if not check['success'] and check['required']:
+            failed_checks.append(f\"• {check['name']}: {check['error']}\")
+    
+    failure_details = '\n'.join(failed_checks)
+    # Write to file to avoid shell escaping issues
+    with open('failure_details.txt', 'w') as f:
+        f.write(failure_details)
+"
+
+      - name: Upload health report
+        uses: actions/upload-artifact@v3
+        with:
+          name: health-report-${{ github.run_number }}
+          path: health_report.json
+          retention-days: 30
+
+      - name: Read failure details
+        if: steps.health_check.outputs.health_status == 'failure'
+        id: failure_details
+        run: |
+          if [ -f failure_details.txt ]; then
+            echo "failure_details<<EOF" >> $GITHUB_OUTPUT
+            cat failure_details.txt >> $GITHUB_OUTPUT
+            echo "EOF" >> $GITHUB_OUTPUT
+          else
+            echo "failure_details=Unknown failure" >> $GITHUB_OUTPUT
+          fi
+
+      # ==================== SLACK NOTIFICATION ====================
+      - name: Send Slack notification on failure
+        if: |
+          (steps.health_check.outputs.health_status == 'failure' && 
+           (env.NOTIFICATION_LEVEL == 'failure-only' || env.NOTIFICATION_LEVEL == 'always')) ||
+          (steps.health_check.outputs.health_status == 'success' && 
+           (env.NOTIFICATION_LEVEL == 'success-only' || env.NOTIFICATION_LEVEL == 'always'))
+        uses: 8398a7/action-slack@v3
+        with:
+          status: ${{ steps.health_check.outputs.health_status == 'success' && 'success' || 'failure' }}
+          channel: '#alerts'  # Change to your Slack channel
+          username: 'Oracle Trader Bot Health Monitor'
+          icon_emoji: ${{ steps.health_check.outputs.health_status == 'success' && ':white_check_mark:' || ':rotating_light:' }}
+          title: Oracle Trader Bot Health Check ${{ steps.health_check.outputs.health_status == 'success' && 'Passed ✅' || 'Failed ❌' }}
+          message: |
+            **Target:** ${{ env.TARGET_URL }}
+            **Time:** ${{ steps.health_check.outputs.check_timestamp }}
+            **Status:** ${{ steps.health_check.outputs.health_status == 'success' && 'All systems healthy' || 'Critical services down' }}
+            
+            **Summary:**
+            • Total checks: ${{ steps.health_check.outputs.total_checks }}
+            • Successful: ${{ steps.health_check.outputs.successful_checks }}
+            • Failed: ${{ steps.health_check.outputs.failed_checks }}
+            • Required failures: ${{ steps.health_check.outputs.required_failures }}
+            
+            ${{ steps.health_check.outputs.health_status == 'failure' && format('**Failed Services:**\n{0}', steps.failure_details.outputs.failure_details) || '**All services operational** 🚀' }}
+            
+            <${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|View Details>
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+        continue-on-error: true
+
+      # ==================== EMAIL NOTIFICATION ====================
+      - name: Send email notification on failure
+        if: |
+          (steps.health_check.outputs.health_status == 'failure' && 
+           (env.NOTIFICATION_LEVEL == 'failure-only' || env.NOTIFICATION_LEVEL == 'always')) ||
+          (steps.health_check.outputs.health_status == 'success' && 
+           (env.NOTIFICATION_LEVEL == 'success-only' || env.NOTIFICATION_LEVEL == 'always'))
+        uses: dawidd6/action-send-mail@v3
+        with:
+          server_address: smtp.gmail.com  # Change to your SMTP server
+          server_port: 587
+          username: ${{ secrets.EMAIL_USERNAME }}
+          password: ${{ secrets.EMAIL_PASSWORD }}
+          subject: |
+            Oracle Trader Bot Health Alert: ${{ steps.health_check.outputs.health_status == 'success' && 'Services Healthy ✅' || 'Services Down ❌' }}
+          to: ${{ secrets.ALERT_EMAIL_TO }}
+          from: Oracle Trader Bot Monitor <${{ secrets.EMAIL_USERNAME }}>
+          html_body: |
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <style>
+                    body { font-family: Arial, sans-serif; margin: 20px; }
+                    .header { background-color: ${{ steps.health_check.outputs.health_status == 'success' && '#d4edda' || '#f8d7da' }}; padding: 15px; border-radius: 5px; margin-bottom: 20px; }
+                    .success { color: #155724; }
+                    .failure { color: #721c24; }
+                    .summary { background-color: #f8f9fa; padding: 15px; border-radius: 5px; margin: 15px 0; }
+                    .failed-service { background-color: #fff3cd; padding: 10px; margin: 5px 0; border-left: 4px solid #ffc107; }
+                    .footer { margin-top: 30px; font-size: 12px; color: #6c757d; }
+                </style>
+            </head>
+            <body>
+                <div class="header">
+                    <h2 class="${{ steps.health_check.outputs.health_status == 'success' && 'success' || 'failure' }}">
+                        🏥 Oracle Trader Bot Health Monitor
+                        ${{ steps.health_check.outputs.health_status == 'success' && '✅ HEALTHY' || '❌ UNHEALTHY' }}
+                    </h2>
+                </div>
+                
+                <p><strong>Target URL:</strong> ${{ env.TARGET_URL }}</p>
+                <p><strong>Check Time:</strong> ${{ steps.health_check.outputs.check_timestamp }}</p>
+                <p><strong>Workflow:</strong> <a href="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}">View GitHub Action Run</a></p>
+                
+                <div class="summary">
+                    <h3>📊 Summary</h3>
+                    <ul>
+                        <li>Total checks: ${{ steps.health_check.outputs.total_checks }}</li>
+                        <li>✅ Successful: ${{ steps.health_check.outputs.successful_checks }}</li>
+                        <li>❌ Failed: ${{ steps.health_check.outputs.failed_checks }}</li>
+                        <li>🚨 Required failures: ${{ steps.health_check.outputs.required_failures }}</li>
+                    </ul>
+                </div>
+                
+                ${{ steps.health_check.outputs.health_status == 'failure' && format('<div><h3>🚨 Failed Services</h3><div class="failed-service">{0}</div></div>', steps.failure_details.outputs.failure_details) || '<div><h3>🚀 Status</h3><p>All services are operational and responding correctly.</p></div>' }}
+                
+                <div class="footer">
+                    <p>This is an automated health check from Oracle Trader Bot monitoring system.</p>
+                    <p>Repository: <a href="${{ github.server_url }}/${{ github.repository }}">${{ github.repository }}</a></p>
+                </div>
+            </body>
+            </html>
+        continue-on-error: true
+
+      # ==================== GITHUB ISSUES INTEGRATION ====================
+      - name: Create GitHub issue on persistent failure
+        if: steps.health_check.outputs.health_status == 'failure' && steps.health_check.outputs.required_failures != '0'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            // Check if there's already an open health monitoring issue
+            const { data: issues } = await github.rest.issues.listForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              labels: 'health-monitor,bug',
+              state: 'open'
+            });
+            
+            const existingIssue = issues.find(issue => 
+              issue.title.includes('Health Monitor Alert')
+            );
+            
+            const issueBody = `
+## 🚨 Health Monitor Alert
+
+**Target URL:** ${{ env.TARGET_URL }}
+**Check Time:** ${{ steps.health_check.outputs.check_timestamp }}
+**Status:** ❌ UNHEALTHY
+
+### Summary
+- Total checks: ${{ steps.health_check.outputs.total_checks }}
+- Successful: ${{ steps.health_check.outputs.successful_checks }}
+- Failed: ${{ steps.health_check.outputs.failed_checks }}
+- **Required failures: ${{ steps.health_check.outputs.required_failures }}**
+
+### Failed Services
+${{ steps.failure_details.outputs.failure_details }}
+
+### Action Required
+Please investigate the failed endpoints immediately. The system may be experiencing:
+- Database connectivity issues
+- Application server problems  
+- Network connectivity problems
+- Configuration issues
+
+### Workflow Details
+- **Run:** [${{ github.run_id }}](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})
+- **Triggered by:** Health Monitor (Cron: every hour)
+
+---
+*This issue was automatically created by the Health Monitor workflow.*
+`;
+
+            if (existingIssue) {
+              // Update existing issue with latest status
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: existingIssue.number,
+                body: `### 🔄 Health Check Update - ${new Date().toISOString()}
+                
+Still experiencing failures:
+${{ steps.failure_details.outputs.failure_details }}
+
+[View latest run](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})`
+              });
+            } else {
+              // Create new issue
+              await github.rest.issues.create({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                title: `🚨 Health Monitor Alert - Services Down (${{ steps.health_check.outputs.check_timestamp }})`,
+                body: issueBody,
+                labels: ['health-monitor', 'bug', 'urgent']
+              });
+            }
+        continue-on-error: true
+
+      # ==================== SUMMARY ====================
+      - name: Job summary
+        if: always()
+        run: |
+          echo "## 🏥 Health Monitor Results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Target:** ${{ env.TARGET_URL }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Time:** ${{ steps.health_check.outputs.check_timestamp }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Status:** ${{ steps.health_check.outputs.health_status == 'success' && '✅ HEALTHY' || '❌ UNHEALTHY' }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Summary" >> $GITHUB_STEP_SUMMARY
+          echo "| Metric | Count |" >> $GITHUB_STEP_SUMMARY
+          echo "|--------|-------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Total checks | ${{ steps.health_check.outputs.total_checks }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| ✅ Successful | ${{ steps.health_check.outputs.successful_checks }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| ❌ Failed | ${{ steps.health_check.outputs.failed_checks }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| 🚨 Required failures | ${{ steps.health_check.outputs.required_failures }} |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          if [ "${{ steps.health_check.outputs.health_status }}" = "failure" ]; then
+            echo "### ⚠️ Action Required" >> $GITHUB_STEP_SUMMARY
+            echo "One or more critical services are not responding. Please investigate immediately." >> $GITHUB_STEP_SUMMARY
+          else
+            echo "### 🎉 All Systems Operational" >> $GITHUB_STEP_SUMMARY
+            echo "All health checks passed successfully!" >> $GITHUB_STEP_SUMMARY
+          fi
+
+  # ==================== CLEANUP ====================
+  cleanup:
+    name: Cleanup Old Artifacts
+    runs-on: ubuntu-latest
+    needs: health-monitor
+    if: always()
+    
+    steps:
+      - name: Delete old health reports
+        uses: actions/github-script@v7
+        with:
+          script: |
+            // Keep only the last 10 health report artifacts
+            const { data: artifacts } = await github.rest.actions.listArtifactsForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              per_page: 100
+            });
+            
+            const healthArtifacts = artifacts.artifacts
+              .filter(artifact => artifact.name.startsWith('health-report-'))
+              .sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+            
+            const toDelete = healthArtifacts.slice(10); // Keep newest 10
+            
+            for (const artifact of toDelete) {
+              try {
+                await github.rest.actions.deleteArtifact({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  artifact_id: artifact.id
+                });
+                console.log(`Deleted artifact: ${artifact.name}`);
+              } catch (error) {
+                console.log(`Failed to delete artifact ${artifact.name}: ${error.message}`);
+              }
+            }
