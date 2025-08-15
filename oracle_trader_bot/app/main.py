@@ -218,15 +218,18 @@ app = FastAPI(
     lifespan=lifespan
 )
 
-# Use centralized CORS configuration from settings
-origins = settings.get_all_cors_origins
+# Environment-driven CORS configuration with exact origin allowlist
+origins = settings.get_all_cors_origins()
+logger.info(f"CORS allowed origins: {origins}")
+
 app.add_middleware(
-    CORSMiddleware, 
-    allow_origins=origins, 
+    CORSMiddleware,
+    allow_origins=origins,  # Exact origins only, no wildcards with credentials=True
     allow_credentials=True,
-    allow_methods=['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'], 
-    allow_headers=['*'], 
-    expose_headers=['*']
+    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allow_headers=["*"],
+    expose_headers=["X-RateLimit-Limit", "X-RateLimit-Remaining", "X-RateLimit-Reset", "Retry-After"],
+    max_age=600,  # Cache preflight requests for 10 minutes
 )
 
 # Add security headers middleware

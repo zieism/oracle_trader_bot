@@ -39,36 +39,38 @@ class Settings(BaseSettings):
     SERVER_PUBLIC_IP: str = Field(default="150.241.85.30", description="Public IP for CORS and external access")
     API_INTERNAL_BASE_URL: str = Field(default="http://127.0.0.1:8000", description="Internal API URL for bot communication")
     
-    # CORS Configuration
-    CORS_ALLOWED_ORIGINS: List[str] = Field(
-        default_factory=lambda: [
-            "http://localhost",
-            "http://localhost:5173", 
-            "http://localhost:3000",
-            "http://localhost:8080",
-            "http://localhost:4173",
-            "https://localhost:5173",
-            "http://127.0.0.1:5173", 
-            "http://127.0.0.1:3000"
-        ],
-        description="List of allowed CORS origins"
+    # CORS Configuration - Environment-driven exact origin allowlist
+    FRONTEND_ORIGINS: str = Field(
+        default="http://localhost:5173,https://oracletrader.app,https://www.oracletrader.app",
+        description="Comma-separated list of allowed CORS origins for frontend"
+    )
+    WS_ORIGINS: str = Field(
+        default="ws://localhost:5173,wss://oracletrader.app,wss://www.oracletrader.app", 
+        description="Comma-separated list of allowed WebSocket origins"
     )
 
-    @property 
-    def get_all_cors_origins(self) -> List[str]:
-        """Get all CORS origins including dynamically generated ones with SERVER_PUBLIC_IP."""
-        origins = self.CORS_ALLOWED_ORIGINS.copy()
-        
-        # Add dynamic origins with SERVER_PUBLIC_IP
-        server_origins = [
-            f"http://{self.SERVER_PUBLIC_IP}:5173",
-            f"http://{self.SERVER_PUBLIC_IP}",
-            f"http://{self.SERVER_PUBLIC_IP}:5174", 
-            f"http://{self.SERVER_PUBLIC_IP}:3000",
-            f"https://{self.SERVER_PUBLIC_IP}"
-        ]
-        origins.extend(server_origins)
+    def parse_csv_env(self, var_name: str) -> List[str]:
+        """Parse comma-separated environment variable into list of strings."""
+        value = getattr(self, var_name, "")
+        if not value:
+            return []
+        # Split by comma, strip whitespace, filter empty strings, ensure unique
+        origins = list(set(origin.strip() for origin in value.split(',') if origin.strip()))
         return origins
+
+    def get_all_cors_origins(self) -> List[str]:
+        """Get all CORS origins from environment configuration."""
+        return self.parse_csv_env("FRONTEND_ORIGINS")
+    
+    def get_all_ws_origins(self) -> List[str]:
+        """Get all WebSocket origins from environment configuration."""
+        return self.parse_csv_env("WS_ORIGINS")
+
+    # Legacy CORS configuration (deprecated - use FRONTEND_ORIGINS instead)
+    CORS_ALLOWED_ORIGINS: List[str] = Field(
+        default_factory=lambda: [],
+        description="Legacy CORS origins list - use FRONTEND_ORIGINS instead"
+    )
 
     def has_exchange_credentials(self) -> bool:
         """Check if all required KuCoin API credentials are available."""
