@@ -7,7 +7,7 @@ import os # Import os module
 
 class Settings(BaseSettings):
     PROJECT_NAME: str = "Oracle Trader Bot"
-    VERSION: str = "1.0.0"
+    VERSION: str = "1.0.1"
     DEBUG: bool = False
 
     # App Startup Mode Settings

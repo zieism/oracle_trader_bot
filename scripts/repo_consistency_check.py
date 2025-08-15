@@ -234,7 +234,7 @@ class ConsistencyChecker:
     
     def run_all_checks(self) -> Dict[str, int]:
         """Run all consistency checks"""
-        print("🔍 Running repository consistency checks...")
+        print("Running repository consistency checks...")
         
         results = {
             "hardcoded_ips": self.check_hardcoded_ips(),
@@ -249,10 +249,10 @@ class ConsistencyChecker:
         total_violations = sum(results.values())
         
         if total_violations == 0:
-            print("✅ All consistency checks passed!")
+            print("All consistency checks passed!")
             return 0
         
-        print(f"\n❌ Found {total_violations} violations:\n")
+        print(f"\nFound {total_violations} violations:\n")
         
         # Group violations by type
         by_type = {}
@@ -264,7 +264,7 @@ class ConsistencyChecker:
         
         # Print violations
         for v_type, violations in by_type.items():
-            print(f"🚨 {v_type.upper().replace('_', ' ')} ({len(violations)} violations):")
+            print(f"VIOLATION TYPE: {v_type.upper().replace('_', ' ')} ({len(violations)} violations):")
             for v in violations[:10]:  # Limit output
                 severity = v.get("severity", "error")
                 print(f"  [{severity.upper()}] {v['file']}:{v.get('line', '?')}")
@@ -308,7 +308,7 @@ def main():
         ]
         filtered_count = original_count - len(checker.violations)
         if filtered_count > 0 and args.verbose:
-            print(f"📝 Filtered {filtered_count} documentation-only violations (use --strict to include them)")
+            print(f"Filtered {filtered_count} documentation-only violations (use --strict to include them)")
         
         # Recalculate results
         results = {
