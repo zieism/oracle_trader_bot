@@ -205,7 +205,7 @@ class TestAdminAuthAPI:
             from app.security.admin_auth import AdminAuthGuard
             test_guard = AdminAuthGuard()
             
-            with patch('app.api.endpoints.settings_api.admin_auth', test_guard):
+            with patch('oracle_trader_bot.app.security.admin_auth.admin_auth', test_guard):
                 with TestClient(app) as client:
                     response = client.put("/api/v1/settings", json={
                         "PROJECT_NAME": "Test With Auth"
@@ -222,7 +222,7 @@ class TestAdminAuthAPI:
             from app.security.admin_auth import AdminAuthGuard
             test_guard = AdminAuthGuard()
             
-            with patch('app.api.endpoints.settings_api.admin_auth', test_guard):
+            with patch('oracle_trader_bot.app.security.admin_auth.admin_auth', test_guard):
                 with TestClient(app) as client:
                     response = client.put("/api/v1/settings", 
                         json={"PROJECT_NAME": "Test Wrong Token"},
@@ -270,7 +270,7 @@ class TestAdminAuthAPI:
             from app.security.admin_auth import AdminAuthGuard
             test_guard = AdminAuthGuard()
             
-            with patch('app.api.endpoints.settings_api.admin_auth', test_guard):
+            with patch('oracle_trader_bot.app.security.admin_auth.admin_auth', test_guard):
                 with TestClient(app) as client:
                     response = client.get("/api/v1/settings/audit")
                     
@@ -282,7 +282,7 @@ class TestAdminAuthAPI:
             from app.security.admin_auth import AdminAuthGuard
             test_guard = AdminAuthGuard()
             
-            with patch('app.api.endpoints.settings_api.admin_auth', test_guard):
+            with patch('oracle_trader_bot.app.security.admin_auth.admin_auth', test_guard):
                 with TestClient(app) as client:
                     response = client.get("/api/v1/settings/audit",
                         headers={"X-Admin-Token": "audit-token"}
@@ -311,7 +311,7 @@ class TestAdminAuthAPI:
             from app.security.admin_auth import AdminAuthGuard
             test_guard = AdminAuthGuard()
             
-            with patch('app.api.endpoints.settings_api.admin_auth', test_guard):
+            with patch('oracle_trader_bot.app.security.admin_auth.admin_auth', test_guard):
                 with TestClient(app) as client:
                     response = client.post("/api/v1/settings/reset")
                     
@@ -323,7 +323,7 @@ class TestAdminAuthAPI:
             from app.security.admin_auth import AdminAuthGuard
             test_guard = AdminAuthGuard()
             
-            with patch('app.api.endpoints.settings_api.admin_auth', test_guard):
+            with patch('oracle_trader_bot.app.security.admin_auth.admin_auth', test_guard):
                 with TestClient(app) as client:
                     response = client.post("/api/v1/settings/reset",
                         headers={"X-Admin-Token": "reset-token"}
@@ -337,7 +337,7 @@ class TestAdminAuthAPI:
             from app.security.admin_auth import AdminAuthGuard
             test_guard = AdminAuthGuard()
             
-            with patch('app.api.endpoints.settings_api.admin_auth', test_guard):
+            with patch('oracle_trader_bot.app.security.admin_auth.admin_auth', test_guard):
                 with TestClient(app) as client:
                     # Should work without token - GET is not protected
                     response = client.get("/api/v1/settings")

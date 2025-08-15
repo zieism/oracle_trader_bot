@@ -18,8 +18,8 @@ class TestTradingEndpointNoAuth:
         """Setup test client"""
         self.client = TestClient(app)
 
-    @patch('app.api.endpoints.trading.get_kucoin_client')
-    @patch('app.api.endpoints.trading.get_db_session')
+    @patch('oracle_trader_bot.app.api.endpoints.trading.get_kucoin_client')
+    @patch('oracle_trader_bot.app.api.endpoints.trading.get_db_session')
     def test_execute_signal_returns_503_on_missing_credentials(self, mock_db_session, mock_kucoin_client):
         """Test that execute-signal endpoint returns 503 when credentials are missing"""
         
@@ -59,8 +59,8 @@ class TestTradingEndpointNoAuth:
             # If FastAPI serialized it differently, just check we got 503
             assert response.status_code == 503
 
-    @patch('app.api.endpoints.trading.get_kucoin_client')
-    @patch('app.api.endpoints.trading.get_db_session')
+    @patch('oracle_trader_bot.app.api.endpoints.trading.get_kucoin_client')
+    @patch('oracle_trader_bot.app.api.endpoints.trading.get_db_session')
     def test_execute_signal_handles_auth_error_during_order_placement(self, mock_db_session, mock_kucoin_client):
         """Test that execute-signal handles auth error during order placement"""
         

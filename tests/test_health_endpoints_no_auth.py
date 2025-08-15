@@ -16,7 +16,7 @@ class TestHealthEndpointsNoAuth:
     def test_exchange_health_no_credentials(self):
         """Test /api/v1/health/exchange returns 200 with ok=false when no credentials."""
         with TestClient(app) as client:
-            with patch('app.api.endpoints.health.KucoinFuturesClient') as mock_client_class:
+            with patch('oracle_trader_bot.app.exchange_clients.kucoin_futures_client.KucoinFuturesClient') as mock_client_class:
                 # Mock client instance
                 mock_client = Mock()
                 mock_client.get_client_status.return_value = {
@@ -45,7 +45,7 @@ class TestHealthEndpointsNoAuth:
     def test_exchange_health_with_credentials(self):
         """Test /api/v1/health/exchange returns 200 with ok=true when credentials available."""
         with TestClient(app) as client:
-            with patch('app.api.endpoints.health.KucoinFuturesClient') as mock_client_class:
+            with patch('oracle_trader_bot.app.exchange_clients.kucoin_futures_client.KucoinFuturesClient') as mock_client_class:
                 # Mock client instance
                 mock_client = Mock()
                 mock_client.get_client_status.return_value = {
