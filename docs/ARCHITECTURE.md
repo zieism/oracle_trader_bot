@@ -293,26 +293,55 @@ SECURITY_HEADERS_CONTENT_SECURITY_POLICY=False  # Optional: default-src 'self'
 - **HSTS Behavior**: Only applied on HTTPS requests
 - **Middleware Order**: CORS → Security Headers → Rate Limiting → Application
 
-## 🔄 Shims & Compatibility Adapters
+## 🔄 Shims & Compatibility Adapters (Deprecated - Removal in v1.2)
 
-### Current Shims (Deprecation Planned)
+> **⚠️ DEPRECATION NOTICE**: All shims and compatibility adapters are deprecated and will be removed in v1.2. See [SHIM_DEPRECATION_PLAN.md](../SHIM_DEPRECATION_PLAN.md) for complete removal plan and migration guide.
 
-#### **Legacy Import Shims**
-- **Location**: `__init__.py` files with re-exports
-- **Purpose**: Maintain existing import paths during refactor
-- **Example**: `from app.models import BotSettings` → internal routing
-- **Removal Timeline**: Post-stabilization (Phase 4)
+### Current Shims (Scheduled for v1.2 Removal)
 
-#### **Configuration Compatibility**
-- **Dual Access**: Environment variables + settings object
-- **Legacy Patterns**: Direct `os.getenv()` calls alongside `settings.FIELD`
-- **Migration Strategy**: Gradual replacement with centralized config
+#### **Backend Python Shims**
+- **Package-Level**: `oracle_trader_bot/__init__.py` - Redirects `oracle_trader_bot.app.*` → `backend.app.*`
+- **API Endpoints**: `oracle_trader_bot/app/api/endpoints/__init__.py` - Maps old endpoints → new routers
+- **Status**: Emits `DeprecationWarning` on usage
 
-### Deprecation Strategy
-1. **Phase 1**: Introduce new patterns alongside legacy (✅ Complete)
-2. **Phase 2**: Add deprecation warnings to old patterns
-3. **Phase 3**: Update all internal code to new patterns
-4. **Phase 4**: Remove compatibility shims and legacy patterns
+#### **Frontend TypeScript Shims**  
+- **Vite Aliases**: `@pages` → `/src/features`, `@api` → `/src/services/api`
+- **TypeScript Paths**: Legacy path mappings in `tsconfig.json`
+- **Status**: Build warnings for deprecated alias usage
+
+#### **Migration Scripts**
+- **Backend**: `scripts/rewrite_backend_imports.py`, `scripts/rewrite_phase2_imports.py`
+- **Frontend**: `scripts/rewrite_frontend_imports.js`
+- **Status**: Available for automated migration assistance
+
+### Breaking Changes in v1.2
+
+```python
+# ❌ Will be removed in v1.2:
+from oracle_trader_bot.app.core.config import settings
+from app.api.endpoints.trading import router
+
+# ✅ Use instead:
+from app.core.config import settings
+from app.api.routers.trading import router
+```
+
+```typescript
+// ❌ Will be removed in v1.2:
+import '@pages/Component'
+import '@api/client'
+
+// ✅ Use instead:  
+import '@features/feature-name/components/Component'
+import '@services/api/client'
+```
+
+### Migration Path
+1. **Current (v1.1.x)**: Shims emit deprecation warnings guiding to new paths
+2. **v1.1.9**: Final version with compatibility shims
+3. **v1.2.0**: Complete shim removal - breaking change for legacy imports
+
+For detailed migration instructions, see [SHIM_DEPRECATION_PLAN.md](../SHIM_DEPRECATION_PLAN.md).
 
 ## 🚀 Deployment Architecture
 
