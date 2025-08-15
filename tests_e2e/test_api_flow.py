@@ -23,7 +23,12 @@ from typing import Dict, Any, Optional
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
 try:
-    from oracle_trader_bot.app.core.config import settings
+    # Import settings directly to avoid deprecated shim path
+    import sys
+    import os
+    sys.path.append(os.path.join(os.path.dirname(__file__), '..', 'oracle_trader_bot'))
+    from app.core.config import Settings
+    settings = Settings()
 except ImportError:
     # Fallback for different project structure
     sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'oracle_trader_bot'))

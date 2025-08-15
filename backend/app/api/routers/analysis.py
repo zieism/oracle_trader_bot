@@ -270,12 +270,15 @@ async def internal_publish_analysis_log(
     """
     Internal API endpoint for bot_engine to publish analysis logs.
     These logs are then broadcasted to active WebSocket clients.
-    Only accepts POST requests from trusted internal sources (e.g., localhost).
+    Only accepts POST requests from trusted internal sources (localhost/loopback).
     
     **This is an internal endpoint - not for external API consumption.**
     """
     client_host = request.client.host
-    if client_host != "127.0.0.1" and client_host != "localhost":
+    
+    # Allow loopback addresses (localhost, 127.0.0.1, ::1)
+    trusted_hosts = ["127.0.0.1", "localhost", "::1"]
+    if client_host not in trusted_hosts:
         logger.warning(f"Rejected internal-publish request from untrusted host: {client_host}")
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied. Internal endpoint.")
 

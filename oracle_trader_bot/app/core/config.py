@@ -35,9 +35,16 @@ class Settings(BaseSettings):
     KUCOIN_API_BASE_URL: str = "https://api-futures.kucoin.com"
     KUCOIN_SANDBOX: bool = Field(default=False, description="Use KuCoin sandbox environment")
 
-    # Server Configuration
-    SERVER_PUBLIC_IP: str = Field(default="150.241.85.30", description="Public IP for CORS and external access")
-    API_INTERNAL_BASE_URL: str = Field(default="http://127.0.0.1:8000", description="Internal API URL for bot communication")
+    # Server Configuration - Dynamic resolution, no hardcoded IPs
+    @property
+    def external_base_url(self) -> str:
+        """Get external base URL dynamically without hardcoded IPs."""
+        from .network import resolve_external_base_url
+        return resolve_external_base_url()
+    
+    # DEPRECATED: For backward compatibility - will be removed in v1.2
+    SERVER_PUBLIC_IP: str = Field(default="localhost", description="DEPRECATED: Use external_base_url property instead")
+    API_INTERNAL_BASE_URL: str = Field(default="http://localhost:8000", description="Internal API URL for bot communication")
     
     # CORS Configuration - Environment-driven exact origin allowlist
     FRONTEND_ORIGINS: str = Field(
@@ -59,8 +66,17 @@ class Settings(BaseSettings):
         return origins
 
     def get_all_cors_origins(self) -> List[str]:
-        """Get all CORS origins from environment configuration."""
-        return self.parse_csv_env("FRONTEND_ORIGINS")
+        """Get all CORS origins from environment configuration + dynamic resolution."""
+        # Get explicit origins from environment
+        explicit_origins = self.parse_csv_env("FRONTEND_ORIGINS")
+        
+        # Add dynamic origins based on external base URL
+        from .network import get_cors_origins
+        dynamic_origins = get_cors_origins()
+        
+        # Combine and deduplicate
+        all_origins = list(set(explicit_origins + dynamic_origins))
+        return all_origins
     
     def get_all_ws_origins(self) -> List[str]:
         """Get all WebSocket origins from environment configuration."""

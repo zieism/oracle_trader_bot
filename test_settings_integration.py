@@ -5,7 +5,10 @@ import os
 # Add the project root to the Python path
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
-from oracle_trader_bot.app.core.config import settings
+# Import directly from app.core.config instead of through deprecated shim
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), 'oracle_trader_bot')))
+from app.core.config import Settings
+settings = Settings()
 
 def test_settings_endpoints_integration():
     """Test settings endpoints with lite mode support"""
